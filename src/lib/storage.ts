@@ -1,5 +1,5 @@
 import { RecurringTransaction } from '@/components/ui/transactions-recurring';
-import { MonthlyData, Transaction } from '@/types/finance';
+import { MonthlyData, Transaction, DailyBalance } from '@/types/finance';
 
 const STORAGE_KEY = 'finance-tracker-data';
 
@@ -65,7 +65,7 @@ export function addTransaction(
       
       // Procura a transação pelo ID
       const existingTransIndex = dailyBalance.dailyTransactions.findIndex(
-        (t: any) => t.id === transaction.id
+        (t: Transaction) => t.id === transaction.id
       );
       
       // Se encontrou a transação em algum lugar, remova-a e ajuste os totais
@@ -118,7 +118,7 @@ export function addTransaction(
   
   // Encontra o dia correspondente na nova data
   const dayIndex = monthData.dailyBalances.findIndex(
-    (d: any) => new Date(d.date).getDate() === day
+    (d: DailyBalance) => new Date(d.date).getDate() === day
   );
   
   if (dayIndex !== -1) {
@@ -169,7 +169,7 @@ export function removeTransaction(
   
   // Encontra o dia correspondente
   const dayIndex = monthData.dailyBalances.findIndex(
-    (d: any) => new Date(d.date).getDate() === day
+    (d: DailyBalance) => new Date(d.date).getDate() === day
   );
   
   if (dayIndex === -1) return updatedData;
@@ -210,12 +210,12 @@ function updateBalances(monthData: MonthlyData): void {
   let runningBalance = 0;
   
   // Ordena os dias por data
-  monthData.dailyBalances.sort((a: any, b: any) => {
+  monthData.dailyBalances.sort((a: DailyBalance, b: DailyBalance) => {
     return new Date(a.date).getTime() - new Date(b.date).getTime();
   });
   
   // Recalcula o saldo para cada dia
-  monthData.dailyBalances.forEach((day: any) => {
+  monthData.dailyBalances.forEach((day: DailyBalance) => {
     const dailyNet = day.income - day.expense;
     runningBalance += dailyNet;
     day.balance = runningBalance;
@@ -236,7 +236,7 @@ export function applyRecurringTransactions(
   for (const transaction of transactions) {
     // Verifica se a transação já existe para evitar duplicatas
     const existingMonth = updatedData.find(
-      month => month.month === transaction.date.getMonth() && 
+      (month: MonthlyData) => month.month === transaction.date.getMonth() && 
                month.year === transaction.date.getFullYear()
     );
     
@@ -244,7 +244,7 @@ export function applyRecurringTransactions(
       // Procura o dia específico ou cria um novo
       const targetDay = transaction.date.getDate();
       let dailyBalance = existingMonth.dailyBalances.find(
-        day => new Date(day.date).getDate() === targetDay
+        (day: DailyBalance) => new Date(day.date).getDate() === targetDay
       );
       
       // Se o dia não existir, cria um novo
@@ -279,7 +279,7 @@ export function applyRecurringTransactions(
       existingMonth.performance = existingMonth.totalIncome - existingMonth.totalExpense;
       
       // Reordena por data e recalcula os saldos acumulados
-      existingMonth.dailyBalances.sort((a: any, b: any) => 
+      existingMonth.dailyBalances.sort((a: DailyBalance, b: DailyBalance) => 
         new Date(a.date).getTime() - new Date(b.date).getTime()
       );
       
