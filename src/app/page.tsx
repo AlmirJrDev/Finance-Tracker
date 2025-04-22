@@ -9,7 +9,7 @@ import { MonthlyData, Transaction } from '@/types/finance';
 import { Plus } from 'lucide-react';
 import { 
   loadData, 
-  saveData, 
+
   addTransaction, 
   removeTransaction,
   applyRecurringTransactions 
@@ -17,7 +17,6 @@ import {
 import { MonthlySummary } from '@/components/ui/monthly-summary';
 import { TransactionsTable } from '@/components/ui/transactions-table';
 import RecurringTransactions from '@/components/ui/transactions-recurring';
-import LocalStorageViewer from '@/components/ui/LocalStorageViewer';
 import DailyAllowance from '@/components/ui/daily-allowance';
 
 export default function HomePage() {
@@ -87,14 +86,14 @@ export default function HomePage() {
     setAllMonthsData(updatedData);
   };
 
-  const clearAppData = () => {
-    // Remove apenas os dados do seu aplicativo
-    localStorage.removeItem('financialData'); // Ajuste para a chave que você usa
-    alert('Dados do aplicativo removidos com sucesso!');
+  // const clearAppData = () => {
+  //   // Remove apenas os dados do seu aplicativo
+  //   localStorage.removeItem('financialData'); // Ajuste para a chave que você usa
+  //   alert('Dados do aplicativo removidos com sucesso!');
     
-    // Se quiser atualizar o estado da aplicação também
-    setAllMonthsData([]);
-  };
+  //   // Se quiser atualizar o estado da aplicação também
+  //   setAllMonthsData([]);
+  // };
 
   return (
     <div className="container mx-auto py-8">

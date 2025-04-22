@@ -1,4 +1,4 @@
-import { MonthlyData, Transaction } from "@/types/finance";
+import { MonthlyData } from "@/types/finance";
 
 export const MONTHS = [
   "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",

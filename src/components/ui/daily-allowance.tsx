@@ -4,10 +4,9 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { MonthlyData } from '@/types/finance';
-import { Calendar, PiggyBank, BadgeDollarSign } from 'lucide-react';
+import { Calendar, PiggyBank, } from 'lucide-react';
 
 type DailyAllowanceProps = {
   data: MonthlyData;
