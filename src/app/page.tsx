@@ -1,103 +1,162 @@
-import Image from "next/image";
+'use client';
 
-export default function Home() {
+import { useEffect, useState } from 'react';
+import { MonthSelector } from '@/components/ui/month-selector';
+import { Button } from '@/components/ui/button';
+import TransactionForm from '@/components/forms/transaction-form';
+import { MONTHS } from '@/lib/data';
+import { MonthlyData, Transaction } from '@/types/finance';
+import { Plus } from 'lucide-react';
+import { 
+  loadData, 
+  saveData, 
+  addTransaction, 
+  removeTransaction,
+  applyRecurringTransactions 
+} from '@/lib/storage';
+import { MonthlySummary } from '@/components/ui/monthly-summary';
+import { TransactionsTable } from '@/components/ui/transactions-table';
+import RecurringTransactions from '@/components/ui/transactions-recurring';
+import LocalStorageViewer from '@/components/ui/LocalStorageViewer';
+import DailyAllowance from '@/components/ui/daily-allowance';
+
+export default function HomePage() {
+  // Iniciar com array vazio ao invés de INITIAL_DATA
+  const [allMonthsData, setAllMonthsData] = useState<MonthlyData[]>([]);
+  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
+  const [showRecurring, setShowRecurring] = useState(false);
+  
+  // Carrega dados do localStorage quando o componente é montado
+  useEffect(() => {
+    const storedData = loadData();
+    if (storedData && storedData.length > 0) {
+      setAllMonthsData(storedData);
+    }
+    // Removida a parte que usava INITIAL_DATA
+  }, []);
+  
+  // Usar o mês atual como padrão
+  const currentMonth = new Date().getMonth();
+  const currentYear = new Date().getFullYear();
+  
+  const availableMonths = allMonthsData.length > 0 
+    ? allMonthsData.map(data => ({ month: data.month, year: data.year }))
+    : [{ month: currentMonth, year: currentYear }];
+  
+  const defaultMonth = availableMonths.length > 0 
+    ? availableMonths[availableMonths.length - 1] 
+    : { month: currentMonth, year: currentYear };
+  
+  const [selectedMonth, setSelectedMonth] = useState<number>(defaultMonth.month);
+  const [selectedYear, setSelectedYear] = useState<number>(defaultMonth.year);
+
+  const monthlyData = allMonthsData.find(
+    data => data.month === selectedMonth && data.year === selectedYear
+  );
+
+  const handleMonthChange = (month: number, year: number) => {
+    setSelectedMonth(month);
+    setSelectedYear(year);
+  };
+  
+  const handleAddTransaction = () => {
+    setEditingTransaction(null);
+    setIsFormOpen(true);
+  };
+  
+  const handleEditTransaction = (transaction: Transaction) => {
+    setEditingTransaction(transaction);
+    setIsFormOpen(true);
+  };
+  
+  const handleDeleteTransaction = (transactionId: string, date: Date) => {
+    const updatedData = removeTransaction(allMonthsData, transactionId, date);
+    setAllMonthsData(updatedData);
+  };
+  
+  const handleSaveTransaction = (transaction: Transaction) => {
+    const updatedData = addTransaction(allMonthsData, transaction);
+    setAllMonthsData(updatedData);
+    setIsFormOpen(false);
+    setEditingTransaction(null);
+  };
+  
+  const handleApplyRecurringTransactions = (transactions: Transaction[]) => {
+    const updatedData = applyRecurringTransactions(allMonthsData, transactions);
+    setAllMonthsData(updatedData);
+  };
+
+  const clearAppData = () => {
+    // Remove apenas os dados do seu aplicativo
+    localStorage.removeItem('financialData'); // Ajuste para a chave que você usa
+    alert('Dados do aplicativo removidos com sucesso!');
+    
+    // Se quiser atualizar o estado da aplicação também
+    setAllMonthsData([]);
+  };
+
   return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm/6 text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-[family-name:var(--font-geist-mono)] font-semibold">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
-
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+    <div className="container mx-auto py-8">
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-3xl font-bold">Controle Financeiro 2025</h1>
+        <div className="flex gap-2">
+          <Button 
+            variant="outline" 
+            onClick={() => setShowRecurring(!showRecurring)}
           >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+            {showRecurring ? 'Voltar ao Resumo' : 'Transações Recorrentes'}
+          </Button>
+          <Button onClick={handleAddTransaction} className="flex items-center gap-2">
+            <Plus className="h-4 w-4" />
+            Nova Transação
+          </Button>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+      </div>
+      
+      <MonthSelector 
+        availableMonths={availableMonths}
+        currentMonth={selectedMonth}
+        currentYear={selectedYear}
+        onMonthChange={handleMonthChange}
+      />
+      
+      {showRecurring ? (
+  <RecurringTransactions 
+    onAddTransactions={handleApplyRecurringTransactions}
+    selectedMonth={selectedMonth}
+    selectedYear={selectedYear}
+  />
+) : monthlyData ? (
+  <>
+    <MonthlySummary data={monthlyData} />
+    <DailyAllowance data={monthlyData} /> {/* Adicione esta linha aqui */}
+    <TransactionsTable 
+      dailyBalances={monthlyData.dailyBalances} 
+      onEditTransaction={handleEditTransaction}
+      onDeleteTransaction={handleDeleteTransaction}
+    />
+  </>
+) : (
+  
+        <div className="text-center p-8 bg-gray-100 rounded-md">
+          <h3 className="text-lg font-medium">Nenhum dado disponível para {MONTHS[selectedMonth]} de {selectedYear}</h3>
+          <p className="text-gray-500 mb-4">Adicione sua primeira transação para este período.</p>
+          <Button onClick={handleAddTransaction}>Adicionar Transação</Button>
+        </div>
+      )}
+
+      <TransactionForm
+        isOpen={isFormOpen}
+        onClose={() => {
+          setIsFormOpen(false);
+          setEditingTransaction(null);
+        }}
+        onSave={handleSaveTransaction}
+        editTransaction={editingTransaction}
+        currentDate={new Date(selectedYear, selectedMonth, new Date().getDate())}
+      />
+      {/* <LocalStorageViewer/> <Button onClick={clearAppData} variant="destructive">Limpar Dados do App</Button> */}
     </div>
   );
 }

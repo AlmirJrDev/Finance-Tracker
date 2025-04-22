@@ -1,0 +1,444 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Badge } from '@/components/ui/badge';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger
+} from '@/components/ui/dropdown-menu';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
+import { Plus, Calendar, Edit, MoreVertical, Trash2 } from 'lucide-react';
+import { Transaction } from '@/types/finance';
+
+// Definição do tipo para transações recorrentes
+export type RecurringTransaction = {
+  id: string;
+  description: string;
+  amount: number;
+  type: 'entrada' | 'saída';
+  category?: string;
+  note?: string;
+  dayOfMonth: number; // Dia do mês em que a transação ocorre
+  active: boolean;    // Indica se a transação está ativa
+};
+
+type RecurringTransactionsProps = {
+  onAddTransactions: (transactions: Transaction[]) => void;
+  selectedMonth: number;
+  selectedYear: number;
+};
+
+export default function RecurringTransactions({ 
+  onAddTransactions, 
+  selectedMonth, 
+  selectedYear 
+}: RecurringTransactionsProps) {
+  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [recurringTransactions, setRecurringTransactions] = useState<RecurringTransaction[]>([]);
+  const [editTransaction, setEditTransaction] = useState<RecurringTransaction | null>(null);
+  const [pendingTransactions, setPendingTransactions] = useState<Transaction[]>([]);
+  
+  // Formulário
+  const [transaction, setTransaction] = useState<Partial<RecurringTransaction>>({
+    id: '',
+    description: '',
+    amount: 0,
+    type: 'entrada' as const,
+    category: '',
+    note: '',
+    dayOfMonth: 1,
+    active: true,
+  });
+
+  // Carrega transações recorrentes do localStorage
+  useEffect(() => {
+    const storedRecurring = localStorage.getItem('recurringTransactions');
+    if (storedRecurring) {
+      setRecurringTransactions(JSON.parse(storedRecurring));
+    }
+  }, []);
+
+  // Salva transações recorrentes no localStorage quando houver mudanças
+  useEffect(() => {
+    if (recurringTransactions.length > 0) {
+      localStorage.setItem('recurringTransactions', JSON.stringify(recurringTransactions));
+    }
+  }, [recurringTransactions]);
+
+  // Gera transações pendentes para o mês selecionado
+  useEffect(() => {
+    const activeTransactions = recurringTransactions.filter(t => t.active);
+    const daysInMonth = new Date(selectedYear, selectedMonth + 1, 0).getDate();
+    
+    const newPendingTransactions = activeTransactions.map(recTrans => {
+      // Ajusta o dia para não exceder os dias do mês
+      const day = Math.min(recTrans.dayOfMonth, daysInMonth);
+      
+      return {
+        id: `pending-${recTrans.id}-${selectedMonth}-${selectedYear}`,
+        date: new Date(selectedYear, selectedMonth, day),
+        description: recTrans.description,
+        amount: recTrans.amount,
+        type: recTrans.type,
+        category: recTrans.category,
+        note: `[Automático] ${recTrans.note || ''}`,
+        isRecurring: true,
+        recurringId: recTrans.id
+      } as Transaction;
+    });
+    
+    setPendingTransactions(newPendingTransactions);
+  }, [recurringTransactions, selectedMonth, selectedYear]);
+
+  const handleChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+  ) => {
+    const { name, value } = e.target;
+    setTransaction((prev) => ({
+      ...prev,
+      [name]: name === 'amount' || name === 'dayOfMonth' ? parseFloat(value) || 0 : value,
+    }));
+  };
+
+  const handleSelectChange = (name: string, value: string) => {
+    setTransaction((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    // Validação
+    if (!transaction.description || !transaction.amount || transaction.amount <= 0) {
+      alert('Por favor, preencha a descrição e um valor válido.');
+      return;
+    }
+    
+    if (!transaction.dayOfMonth || transaction.dayOfMonth < 1 || transaction.dayOfMonth > 31) {
+      alert('Por favor, informe um dia do mês válido (1-31).');
+      return;
+    }
+    
+    // Formata a transação final
+    const finalTransaction: RecurringTransaction = {
+      id: transaction.id || `rec-${Date.now()}`,
+      description: transaction.description || '',
+      amount: transaction.amount || 0,
+      type: transaction.type as 'entrada' | 'saída',
+      category: transaction.category || '',
+      note: transaction.note || '',
+      dayOfMonth: transaction.dayOfMonth || 1,
+      active: transaction.active !== undefined ? transaction.active : true,
+    };
+    
+    if (editTransaction) {
+      // Atualiza a transação existente
+      setRecurringTransactions(prev => 
+        prev.map(t => t.id === finalTransaction.id ? finalTransaction : t)
+      );
+    } else {
+      // Adiciona nova transação
+      setRecurringTransactions(prev => [...prev, finalTransaction]);
+    }
+    
+    resetForm();
+    setIsFormOpen(false);
+  };
+
+  const resetForm = () => {
+    setTransaction({
+      id: '',
+      description: '',
+      amount: 0,
+      type: 'entrada',
+      category: '',
+      note: '',
+      dayOfMonth: 1,
+      active: true,
+    });
+    setEditTransaction(null);
+  };
+
+  const handleEdit = (transaction: RecurringTransaction) => {
+    setEditTransaction(transaction);
+    setTransaction(transaction);
+    setIsFormOpen(true);
+  };
+
+  const handleDelete = (id: string) => {
+    if (confirm('Tem certeza que deseja excluir esta transação recorrente?')) {
+      setRecurringTransactions(prev => prev.filter(t => t.id !== id));
+    }
+  };
+
+  const handleToggleActive = (id: string) => {
+    setRecurringTransactions(prev => 
+      prev.map(t => t.id === id ? { ...t, active: !t.active } : t)
+    );
+  };
+
+  const handleApplyTransactions = () => {
+    if (pendingTransactions.length > 0) {
+      onAddTransactions(pendingTransactions);
+      alert(`${pendingTransactions.length} transações aplicadas com sucesso!`);
+    } else {
+      alert('Não há transações pendentes para aplicar.');
+    }
+  };
+
+  const formatCurrency = (value: number) => {
+    return new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL'
+    }).format(value);
+  };
+
+  const categories = [
+    'Salário',
+    'Aluguel',
+    'Alimentação',
+    'Transporte',
+    'Educação',
+    'Saúde',
+    'Lazer',
+    'Outros',
+  ];
+
+  return (
+    <>
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle>Transações Recorrentes</CardTitle>
+          <div className="flex gap-2">
+            <Button 
+              variant="outline" 
+              onClick={handleApplyTransactions}
+              disabled={pendingTransactions.length === 0}
+              className="flex items-center gap-1"
+            >
+              <Calendar className="h-4 w-4" />
+              Aplicar ao Mês Atual ({pendingTransactions.length})
+            </Button>
+            <Button onClick={() => setIsFormOpen(true)} className="flex items-center gap-1">
+              <Plus className="h-4 w-4" />
+              Nova Recorrente
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {recurringTransactions.length > 0 ? (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Descrição</TableHead>
+                  <TableHead>Dia do Mês</TableHead>
+                  <TableHead>Valor</TableHead>
+                  <TableHead>Categoria</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Ações</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {recurringTransactions.map((rec) => (
+                  <TableRow key={rec.id}>
+                    <TableCell>{rec.description}</TableCell>
+                    <TableCell>Dia {rec.dayOfMonth}</TableCell>
+                    <TableCell className={rec.type === 'entrada' ? 'text-green-600' : 'text-red-600'}>
+                      {formatCurrency(rec.amount)}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline">{rec.category}</Badge>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={rec.active ? 'default' : 'secondary'}>
+                        {rec.active ? 'Ativo' : 'Inativo'}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon">
+                            <MoreVertical className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => handleEdit(rec)}>
+                            <Edit className="mr-2 h-4 w-4" />
+                            Editar
+                          </DropdownMenuItem>
+                          <DropdownMenuItem 
+                            onClick={() => handleToggleActive(rec.id)}
+                          >
+                            <Calendar className="mr-2 h-4 w-4" />
+                            {rec.active ? 'Desativar' : 'Ativar'}
+                          </DropdownMenuItem>
+                          <DropdownMenuItem 
+                            onClick={() => handleDelete(rec.id)}
+                            className="text-red-600"
+                          >
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            Excluir
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          ) : (
+            <div className="text-center py-8 text-gray-500">
+              <p>Você ainda não cadastrou transações recorrentes.</p>
+              <p>Adicione suas despesas e receitas fixas para automatizar seu controle financeiro.</p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Formulário de transação recorrente */}
+      <Dialog open={isFormOpen} onOpenChange={(open) => {
+        if (!open) resetForm();
+        setIsFormOpen(open);
+      }}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>
+              {editTransaction ? 'Editar Transação Recorrente' : 'Nova Transação Recorrente'}
+            </DialogTitle>
+            <DialogDescription>
+              Cadastre um pagamento ou recebimento que se repete todos os meses.
+            </DialogDescription>
+          </DialogHeader>
+
+          <form onSubmit={handleSubmit} className="space-y-4 py-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="type">Tipo</Label>
+                <Select
+                  value={transaction.type}
+                  onValueChange={(value) => handleSelectChange('type', value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione o tipo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="entrada">Entrada</SelectItem>
+                    <SelectItem value="saída">Saída</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="dayOfMonth">Dia do Mês</Label>
+                <Input
+                  id="dayOfMonth"
+                  name="dayOfMonth"
+                  type="number"
+                  min="1"
+                  max="31"
+                  value={transaction.dayOfMonth || ''}
+                  onChange={handleChange}
+                  placeholder="Ex: 10"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="description">Descrição</Label>
+              <Input
+                id="description"
+                name="description"
+                value={transaction.description || ''}
+                onChange={handleChange}
+                placeholder="Ex: Aluguel, Salário, etc."
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="amount">Valor (R$)</Label>
+                <Input
+                  id="amount"
+                  name="amount"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={transaction.amount || ''}
+                  onChange={handleChange}
+                  placeholder="0,00"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="category">Categoria</Label>
+                <Select
+                  value={transaction.category || ''}
+                  onValueChange={(value) => handleSelectChange('category', value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {categories.map((category) => (
+                      <SelectItem key={category} value={category.toLowerCase()}>
+                        {category}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="note">Observação</Label>
+              <Textarea
+                id="note"
+                name="note"
+                value={transaction.note || ''}
+                onChange={handleChange}
+                placeholder="Adicione uma observação (opcional)"
+                className="resize-none"
+              />
+            </div>
+
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => {
+                resetForm();
+                setIsFormOpen(false);
+              }}>
+                Cancelar
+              </Button>
+              <Button type="submit">
+                {editTransaction ? 'Atualizar' : 'Adicionar'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
