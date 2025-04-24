@@ -136,9 +136,9 @@ export default function CategoryCharts({ data, allMonthsData }: CategoryChartsPr
           />
         </div>
       </CardHeader>
-      <CardContent className='flex w-full divide-x justify-center items-center '>
+      <CardContent className={`flex w-full  justify-between items-center  ${categoryData.length > 0 ? 'divide-x' : ''}`}>
 
-        <div></div>
+      
 
       {categoryData.length > 0 ? (
               <ChartContainer config={chartConfig} className="h-90 flex-1">
@@ -163,7 +163,7 @@ export default function CategoryCharts({ data, allMonthsData }: CategoryChartsPr
                 </PieChart>
               </ChartContainer>
             ) : (
-              <div className="text-center py-12 text-gray-500">
+              <div className="   text-gray-500">
                 Nenhum gasto registrado neste período
               </div>
             )}
@@ -186,7 +186,7 @@ export default function CategoryCharts({ data, allMonthsData }: CategoryChartsPr
                 </BarChart>
               </ChartContainer>
             ) : (
-              <div className="text-center py-12 text-gray-500">
+              <div className=" text-gray-500">
                 Nenhum gasto registrado neste período
               </div>
             )}

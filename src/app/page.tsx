@@ -22,6 +22,7 @@ import DailyAllowance from '@/components/ui/daily-allowance';
 import CategoryCharts from '@/components/ui/categoria-chart';
 import { ModeToggle } from '@/components/ui/themeSwitcher';
 import RecurringExpenseTracker from '@/components/ui/RecurringExpenseTracker';
+import { Card } from '@/components/ui/card';
 
 
 export default function HomePage() {
@@ -153,11 +154,11 @@ export default function HomePage() {
   </>
 ) : (
   
-        <div className="text-center p-8 bg-gray-100 rounded-md">
+        <Card className="text-center p-8 rounded-md flex justify-center items-center">
           <h3 className="text-lg font-medium">Nenhum dado disponível para {MONTHS[selectedMonth]} de {selectedYear}</h3>
           <p className="text-gray-500 mb-4">Adicione sua primeira transação para este período.</p>
-          <Button onClick={handleAddTransaction}>Adicionar Transação</Button>
-        </div>
+          <Button onClick={handleAddTransaction} className='w-96'>Adicionar Transação</Button>
+        </Card>
       )}
 
       <TransactionForm
