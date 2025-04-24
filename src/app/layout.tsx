@@ -1,6 +1,8 @@
+import { Toaster } from '@/components/ui/sonner';
 import './globals.css';
 import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
+import { ThemeProvider } from "@/components/theme-provider"
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -15,8 +17,14 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="pt-BR">
-      <body className={inter.className}>{children}</body>
+    <html lang="pt-BR"  suppressHydrationWarning  >
+      <body className={inter.className}>
+        <ThemeProvider  attribute="class"
+            defaultTheme="system"
+            enableSystem
+            disableTransitionOnChange
+            >{children}   <Toaster richColors />
+        </ThemeProvider></body>
     </html>
   );
 }

@@ -85,86 +85,96 @@ export function TransactionsTable({
           </TableHeader>
           <TableBody>
           {daysWithTransactions.length > 0 ? (
-            daysWithTransactions.map((day) => (
-              <Fragment key={day.date.getTime()}>
-                <TableRow 
-                  className="cursor-pointer hover:bg-gray-50"
-                  onClick={() => toggleDay(day.date.getDate())}
-                >
-                  <TableCell>{formatDate(day.date)}</TableCell>
-                  <TableCell className="text-green-600">{day.income > 0 ? formatCurrency(day.income) : '-'}</TableCell>
-                  <TableCell className="text-red-600">{day.expense > 0 ? formatCurrency(day.expense) : '-'}</TableCell>
-                  <TableCell>{formatCurrency(day.income - day.expense)}</TableCell>
-                  <TableCell className={day.balance < 0 ? 'text-red-600 font-bold' : 'text-green-600 font-bold'}>{formatCurrency(day.balance)}</TableCell>
-                </TableRow>
-                
-                {expandedDay === day.date.getDate() && (
-                  <TableRow>
-                    <TableCell colSpan={5} className="p-0 bg-gray-50">
-                      <div className="p-4">
-                        <h4 className="text-sm font-medium mb-2">Transações do dia</h4>
-                        
-                        {day.dailyTransactions.length > 0 ? (
-                          <Table>
-                            <TableHeader>
-                              <TableRow>
-                                <TableHead>Descrição</TableHead>
-                                <TableHead>Categoria</TableHead>
-                                <TableHead>Valor</TableHead>
-                                <TableHead>Tipo</TableHead>
-                                <TableHead></TableHead>
-                              </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                              {day.dailyTransactions.map((transaction) => (
-                                <TableRow key={transaction.id}>
-                                  <TableCell>{transaction.description}</TableCell>
-                                  <TableCell>
-                                    <Badge variant="outline">{transaction.category}</Badge>
-                                  </TableCell>
-                                  <TableCell className={transaction.type === 'income' ? 'text-green-600' : 'text-red-600'}>
-                                    {formatCurrency(transaction.amount)}
-                                  </TableCell>
-                                  <TableCell>
-                                    <Badge variant={transaction.type === 'income' ? 'default' : 'destructive'}>
-                                      {transaction.type === 'income' ? 'Entrada' : 'Saída'}
-                                    </Badge>
-                                  </TableCell>
-                                  <TableCell>
-                                    <DropdownMenu>
-                                      <DropdownMenuTrigger asChild>
-                                        <Button variant="ghost" size="icon">
-                                          <MoreVertical className="h-4 w-4" />
-                                        </Button>
-                                      </DropdownMenuTrigger>
-                                      <DropdownMenuContent align="end">
-                                        <DropdownMenuItem onClick={() => onEditTransaction(transaction)}>
-                                          <Edit className="mr-2 h-4 w-4" />
-                                          Editar
-                                        </DropdownMenuItem>
-                                        <DropdownMenuItem 
-                                          onClick={() => onDeleteTransaction(transaction.id, day.date)}
-                                          className="text-red-600"
-                                        >
-                                          <Trash2 className="mr-2 h-4 w-4" />
-                                          Excluir
-                                        </DropdownMenuItem>
-                                      </DropdownMenuContent>
-                                    </DropdownMenu>
-                                  </TableCell>
-                                </TableRow>
-                              ))}
-                            </TableBody>
-                          </Table>
-                        ) : (
-                          <p className="text-sm text-gray-500">Não há transações detalhadas para este dia.</p>
-                        )}
-                      </div>
-                    </TableCell>
+            daysWithTransactions.map((day, dayIndex) => {
+              // Create a unique date identifier for this day
+              const dateKey = `day-${dayIndex}-${day.date.toISOString().split('T')[0]}`;
+              
+              return (
+                <Fragment key={dateKey}>
+                  <TableRow 
+                    className="cursor-pointer"
+                    onClick={() => toggleDay(day.date.getDate())}
+                  >
+                    <TableCell>{formatDate(day.date)}</TableCell>
+                    <TableCell className="text-green-600">{day.income > 0 ? formatCurrency(day.income) : '-'}</TableCell>
+                    <TableCell className="text-red-600">{day.expense > 0 ? formatCurrency(day.expense) : '-'}</TableCell>
+                    <TableCell>{formatCurrency(day.income - day.expense)}</TableCell>
+                    <TableCell className={day.balance < 0 ? 'text-red-600 font-bold' : 'text-green-600 font-bold'}>{formatCurrency(day.balance)}</TableCell>
                   </TableRow>
-                )}
-              </Fragment>
-            ))
+                  
+                  {expandedDay === day.date.getDate() && (
+                    <TableRow key={`expanded-${dateKey}`}>
+                      <TableCell colSpan={5} className="p-0 ">
+                        <div className="p-4">
+                          <h4 className="text-sm font-medium mb-2">Transações do dia</h4>
+                          
+                          {day.dailyTransactions.length > 0 ? (
+                            <Table>
+                              <TableHeader>
+                                <TableRow>
+                                  <TableHead>Descrição</TableHead>
+                                  <TableHead>Categoria</TableHead>
+                                  <TableHead>Valor</TableHead>
+                                  <TableHead>Tipo</TableHead>
+                                  <TableHead></TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {day.dailyTransactions.map((transaction, transIndex) => {
+                                  // Generate a completely unique key for each transaction
+                                  const transactionKey = `trans-${dayIndex}-${transIndex}-${transaction.id}`;
+                                  
+                                  return (
+                                    <TableRow key={transactionKey}>
+                                      <TableCell>{transaction.description}</TableCell>
+                                      <TableCell>
+                                        <Badge variant="outline">{transaction.category}</Badge>
+                                      </TableCell>
+                                      <TableCell className={transaction.type === 'income' || transaction.type === 'entrada' ? 'text-green-600' : 'text-red-600'}>
+                                        {formatCurrency(transaction.amount)}
+                                      </TableCell>
+                                      <TableCell>
+                                        <Badge variant={transaction.type === 'income' || transaction.type === 'entrada' ? 'default' : 'destructive'}>
+                                          {transaction.type === 'income' || transaction.type === 'entrada' ? 'Entrada' : 'Saída'}
+                                        </Badge>
+                                      </TableCell>
+                                      <TableCell>
+                                        <DropdownMenu>
+                                          <DropdownMenuTrigger asChild>
+                                            <Button variant="ghost" size="icon">
+                                              <MoreVertical className="h-4 w-4" />
+                                            </Button>
+                                          </DropdownMenuTrigger>
+                                          <DropdownMenuContent align="end">
+                                            <DropdownMenuItem onClick={() => onEditTransaction(transaction)}>
+                                              <Edit className="mr-2 h-4 w-4" />
+                                              Editar
+                                            </DropdownMenuItem>
+                                            <DropdownMenuItem 
+                                              onClick={() => onDeleteTransaction(transaction.id, day.date)}
+                                              className="text-red-600"
+                                            >
+                                              <Trash2 className="mr-2 h-4 w-4" />
+                                              Excluir
+                                            </DropdownMenuItem>
+                                          </DropdownMenuContent>
+                                        </DropdownMenu>
+                                      </TableCell>
+                                    </TableRow>
+                                  );
+                                })}
+                              </TableBody>
+                            </Table>
+                          ) : (
+                            <p className="text-sm text-gray-500">Não há transações detalhadas para este dia.</p>
+                          )}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </Fragment>
+              );
+            })
           ) : (
             <TableRow>
               <TableCell colSpan={5} className="text-center py-6">

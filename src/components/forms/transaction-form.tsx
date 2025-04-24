@@ -21,6 +21,9 @@ import {
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Transaction } from '@/types/finance';
+import { loadCategories, addCategory } from '@/lib/categories';
+import { PlusCircle } from 'lucide-react';
+import { toast } from 'sonner'; 
 
 type TransactionFormProps = {
   isOpen: boolean;
@@ -40,6 +43,15 @@ export default function TransactionForm({
   const [transaction, setTransaction] = useState<Partial<Transaction>>(
     getInitialState(editTransaction, currentDate)
   );
+  const [categories, setCategories] = useState<string[]>([]);
+  const [newCategory, setNewCategory] = useState<string>('');
+  const [showNewCategory, setShowNewCategory] = useState<boolean>(false);
+
+  // Carrega categorias ao iniciar
+  useEffect(() => {
+    const loadedCategories = loadCategories();
+    setCategories(loadedCategories);
+  }, []);
 
   // Este useEffect atualiza o estado do formulário quando editTransaction muda
   useEffect(() => {
@@ -87,14 +99,28 @@ export default function TransactionForm({
     }));
   };
   
+  const handleAddCategory = () => {
+    if (newCategory.trim()) {
+      const updatedCategories = addCategory(newCategory.trim());
+      setCategories(updatedCategories);
+      handleSelectChange('category', newCategory.trim().toLowerCase());
+      setNewCategory('');
+      setShowNewCategory(false);
+    }
+  };
+  
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
       
-    // Validação básica
-    if (!transaction.description || !transaction.amount || transaction.amount <= 0) {
-      alert('Por favor, preencha a descrição e um valor válido.');
-      return;
-    }
+  // Validação básica
+  if (!transaction.description || !transaction.amount || transaction.amount <= 0) {
+    // Substituindo o alert pelo toast
+    toast.error("Erro de validação", {
+   
+      description: "Por favor, preencha a descrição e um valor válido."
+    });
+    return;
+  }
       
     // Formata a transação final
     const finalTransaction: Transaction = {
@@ -108,23 +134,15 @@ export default function TransactionForm({
     };
       
     onSave(finalTransaction);
+    toast.success(isEditing ? "Transação atualizada" : "Transação adicionada", {
+      description: `${transaction.description} foi ${isEditing ? 'atualizada' : 'adicionada'} com sucesso.`
+    });
     onClose();
   };
 
   const handleCancel = () => {
     onClose();
   };
-
-  const categories = [
-    'Salário',
-    'Aluguel',
-    'Alimentação',
-    'Transporte',
-    'Educação',
-    'Saúde',
-    'Lazer',
-    'Outros',
-  ];
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -209,21 +227,54 @@ export default function TransactionForm({
 
             <div className="space-y-2">
               <Label htmlFor="category">Categoria</Label>
-              <Select
-                value={transaction.category || ''}
-                onValueChange={(value) => handleSelectChange('category', value)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione" />
-                </SelectTrigger>
-                <SelectContent>
-                  {categories.map((category) => (
-                    <SelectItem key={category} value={category.toLowerCase()}>
-                      {category}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {showNewCategory ? (
+                <div className="flex space-x-2">
+                  <Input
+                    id="newCategory"
+                    name="newCategory"
+                    value={newCategory}
+                    onChange={(e) => setNewCategory(e.target.value)}
+                    placeholder="Nova categoria"
+                  />
+                  <Button 
+                    type="button" 
+                    size="sm" 
+                    onClick={handleAddCategory}
+                  >
+                    +
+                  </Button>
+                </div>
+              ) : (
+                <div className="relative">
+                  <Select
+                    value={transaction.category || ''}
+                    onValueChange={(value) => handleSelectChange('category', value)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {categories.map((category) => (
+                        <SelectItem key={category} value={category.toLowerCase()}>
+                          {category}
+                        </SelectItem>
+                      ))}
+                      <div className="py-2 px-2 border-t">
+                        <Button 
+                          type="button" 
+                          variant="ghost" 
+                          size="sm" 
+                          className="w-full flex items-center justify-center gap-1"
+                          onClick={() => setShowNewCategory(true)}
+                        >
+                          <PlusCircle className="h-4 w-4 mr-1" />
+                          Adicionar categoria
+                        </Button>
+                      </div>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
             </div>
           </div>
 

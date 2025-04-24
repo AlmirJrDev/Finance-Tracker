@@ -1,6 +1,5 @@
 'use client';
 
-import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -22,6 +21,9 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { RecurringTransaction, RecurrenceFrequency } from '@/types/finance';
+import { loadCategories, addCategory } from '@/lib/categories';
+import { useState, useEffect } from 'react';
+import { PlusCircle } from 'lucide-react';
 
 type RecurringTransactionFormProps = {
   isOpen: boolean;
@@ -51,7 +53,15 @@ export default function RecurringTransactionForm({
     }
   );
 
+  const [categories, setCategories] = useState<string[]>([]);
+  const [newCategory, setNewCategory] = useState<string>('');
+  const [showNewCategory, setShowNewCategory] = useState<boolean>(true);
+
   const isEditing = Boolean(editTransaction);
+
+
+
+
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
@@ -148,16 +158,7 @@ export default function RecurringTransactionForm({
     onClose();
   };
 
-  const categories = [
-    'Salário',
-    'Aluguel',
-    'Alimentação',
-    'Transporte',
-    'Educação',
-    'Saúde',
-    'Lazer',
-    'Outros',
-  ];
+
 
   const weekDays = [
     'Domingo',
@@ -168,6 +169,23 @@ export default function RecurringTransactionForm({
     'Sexta-feira',
     'Sábado',
   ];
+
+  // No useEffect inicial, adicione:
+useEffect(() => {
+  const loadedCategories = loadCategories();
+  setCategories(loadedCategories);
+}, []);
+
+// Adicione esta função para adicionar categorias personalizadas
+const handleAddCategory = () => {
+  if (newCategory.trim()) {
+    const updatedCategories = addCategory(newCategory.trim());
+    setCategories(updatedCategories);
+    handleSelectChange('category', newCategory.trim().toLowerCase());
+    setNewCategory('');
+    setShowNewCategory(false);
+  }
+};
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -242,23 +260,56 @@ export default function RecurringTransactionForm({
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="category">Categoria</Label>
-              <Select
-                value={transaction.category || ''}
-                onValueChange={(value) => handleSelectChange('category', value)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione" />
-                </SelectTrigger>
-                <SelectContent>
-                  {categories.map((category) => (
-                    <SelectItem key={category} value={category.toLowerCase()}>
-                      {category}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+  <Label htmlFor="category">Categoria</Label>
+  {showNewCategory ? (
+    <div className="flex space-x-2">
+      <Input
+        id="newCategory"
+        name="newCategory"
+        value={newCategory}
+        onChange={(e) => setNewCategory(e.target.value)}
+        placeholder="Nova categoria"
+      />
+      <Button 
+        type="button" 
+        size="sm" 
+        onClick={handleAddCategory}
+      >
+        +
+      </Button>
+    </div>
+  ) : (
+    <div className="relative">
+      <Select
+        value={transaction.category || ''}
+        onValueChange={(value) => handleSelectChange('category', value)}
+      >
+        <SelectTrigger>
+          <SelectValue placeholder="Selecione" />
+        </SelectTrigger>
+        <SelectContent>
+          {categories.map((category) => (
+            <SelectItem key={category} value={category.toLowerCase()}>
+              {category}
+            </SelectItem>
+          ))}
+          <div className="py-2 px-2 border-t">
+            <Button 
+              type="button" 
+              variant="ghost" 
+              size="sm" 
+              className="w-full flex items-center justify-center gap-1"
+              onClick={() => setShowNewCategory(true)}
+            >
+              <PlusCircle className="h-4 w-4 mr-1" />
+              Adicionar categoria
+            </Button>
+          </div>
+        </SelectContent>
+      </Select>
+    </div>
+  )}
+</div>
           </div>
 
           {transaction.frequency === 'monthly' && (

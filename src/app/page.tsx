@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { MonthSelector } from '@/components/ui/month-selector';
 import { Button } from '@/components/ui/button';
 import TransactionForm from '@/components/forms/transaction-form';
+import CategoryManager from '@/components/ui/category-manager';
 import { MONTHS } from '@/lib/data';
 import { MonthlyData, Transaction } from '@/types/finance';
 import { Plus } from 'lucide-react';
@@ -18,6 +19,10 @@ import { MonthlySummary } from '@/components/ui/monthly-summary';
 import { TransactionsTable } from '@/components/ui/transactions-table';
 import RecurringTransactions from '@/components/ui/transactions-recurring';
 import DailyAllowance from '@/components/ui/daily-allowance';
+import CategoryCharts from '@/components/ui/categoria-chart';
+import { ModeToggle } from '@/components/ui/themeSwitcher';
+import RecurringExpenseTracker from '@/components/ui/RecurringExpenseTracker';
+
 
 export default function HomePage() {
   // Iniciar com array vazio ao invés de INITIAL_DATA
@@ -25,6 +30,7 @@ export default function HomePage() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const [showRecurring, setShowRecurring] = useState(false);
+  const [showCategoryManager, setShowCategoryManager] = useState(false);
   
   // Carrega dados do localStorage quando o componente é montado
   useEffect(() => {
@@ -96,22 +102,29 @@ export default function HomePage() {
   // };
 
   return (
-    <div className="container mx-auto py-8">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold">Controle Financeiro 2025</h1>
-        <div className="flex gap-2">
-          <Button 
-            variant="outline" 
-            onClick={() => setShowRecurring(!showRecurring)}
-          >
-            {showRecurring ? 'Voltar ao Resumo' : 'Transações Recorrentes'}
-          </Button>
-          <Button onClick={handleAddTransaction} className="flex items-center gap-2">
-            <Plus className="h-4 w-4" />
-            Nova Transação
-          </Button>
-        </div>
-      </div>
+    <div className="container mx-auto py-8 px-24">
+     <div className="flex justify-between items-center mb-6">
+  <h1 className="text-3xl font-bold">Controle Financeiro 2025</h1>
+  <div className="flex gap-2">
+    <ModeToggle/>
+    <Button 
+      variant="outline" 
+      onClick={() => setShowCategoryManager(true)}
+    >
+      Gerenciar Categorias
+    </Button>
+    <Button 
+      variant="outline" 
+      onClick={() => setShowRecurring(!showRecurring)}
+    >
+      {showRecurring ? 'Voltar ao Resumo' : 'Transações Recorrentes'}
+    </Button>
+    <Button onClick={handleAddTransaction} className="flex items-center gap-2">
+      <Plus className="h-4 w-4" />
+      Nova Transação
+    </Button>
+  </div>
+</div>
       
       <MonthSelector 
         availableMonths={availableMonths}
@@ -129,12 +142,14 @@ export default function HomePage() {
 ) : monthlyData ? (
   <>
     <MonthlySummary data={monthlyData} />
-    <DailyAllowance data={monthlyData} /> {/* Adicione esta linha aqui */}
-    <TransactionsTable 
-      dailyBalances={monthlyData.dailyBalances} 
-      onEditTransaction={handleEditTransaction}
-      onDeleteTransaction={handleDeleteTransaction}
-    />
+    <CategoryCharts data={monthlyData} allMonthsData={allMonthsData} />
+    <DailyAllowance data={monthlyData} />
+<RecurringExpenseTracker data={monthlyData} />
+<TransactionsTable 
+  dailyBalances={monthlyData.dailyBalances} 
+  onEditTransaction={handleEditTransaction}
+  onDeleteTransaction={handleDeleteTransaction}
+/>
   </>
 ) : (
   
@@ -156,6 +171,10 @@ export default function HomePage() {
         currentDate={new Date(selectedYear, selectedMonth, new Date().getDate())}
       />
       {/* <LocalStorageViewer/> <Button onClick={clearAppData} variant="destructive">Limpar Dados do App</Button> */}
+      <CategoryManager 
+  isOpen={showCategoryManager}
+  onClose={() => setShowCategoryManager(false)}
+/>
     </div>
   );
 }

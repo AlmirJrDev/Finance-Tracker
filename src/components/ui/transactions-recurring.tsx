@@ -29,8 +29,10 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { Plus, Calendar, Edit, MoreVertical, Trash2 } from 'lucide-react';
+import { Plus, Calendar, Edit, MoreVertical, Trash2, PlusCircle } from 'lucide-react';
 import { Transaction } from '@/types/finance';
+import { addCategory, loadCategories } from '@/lib/categories';
+import { toast } from 'sonner';
 
 // Definição do tipo para transações recorrentes
 export type RecurringTransaction = {
@@ -59,6 +61,9 @@ export default function RecurringTransactions({
   const [recurringTransactions, setRecurringTransactions] = useState<RecurringTransaction[]>([]);
   const [editTransaction, setEditTransaction] = useState<RecurringTransaction | null>(null);
   const [pendingTransactions, setPendingTransactions] = useState<Transaction[]>([]);
+  const [categories, setCategories] = useState<string[]>([]);
+const [newCategory, setNewCategory] = useState<string>('');
+const [showNewCategory, setShowNewCategory] = useState<boolean>(false);
   
   // Formulário
   const [transaction, setTransaction] = useState<Partial<RecurringTransaction>>({
@@ -134,12 +139,12 @@ export default function RecurringTransactions({
     
     // Validação
     if (!transaction.description || !transaction.amount || transaction.amount <= 0) {
-      alert('Por favor, preencha a descrição e um valor válido.');
+      toast.error('Por favor, preencha a descrição e um valor válido.');
       return;
     }
     
     if (!transaction.dayOfMonth || transaction.dayOfMonth < 1 || transaction.dayOfMonth > 31) {
-      alert('Por favor, informe um dia do mês válido (1-31).');
+      toast.error('Por favor, informe um dia do mês válido (1-31).');
       return;
     }
     
@@ -166,6 +171,9 @@ export default function RecurringTransactions({
     }
     
     resetForm();
+    toast.success("Transação adicionada", {
+      description: `${transaction.description} foi adicionada com sucesso.`
+    });
     setIsFormOpen(false);
   };
 
@@ -217,16 +225,21 @@ export default function RecurringTransactions({
     }).format(value);
   };
 
-  const categories = [
-    'Salário',
-    'Aluguel',
-    'Alimentação',
-    'Transporte',
-    'Educação',
-    'Saúde',
-    'Lazer',
-    'Outros',
-  ];
+  useEffect(() => {
+    const loadedCategories = loadCategories();
+    setCategories(loadedCategories);
+  }, []);
+  
+  // Adicione esta função para adicionar categorias personalizadas
+  const handleAddCategory = () => {
+    if (newCategory.trim()) {
+      const updatedCategories = addCategory(newCategory.trim());
+      setCategories(updatedCategories);
+      handleSelectChange('category', newCategory.trim().toLowerCase());
+      setNewCategory('');
+      setShowNewCategory(false);
+    }
+  }
 
   return (
     <>
@@ -394,23 +407,57 @@ export default function RecurringTransactions({
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="category">Categoria</Label>
-                <Select
-                  value={transaction.category || ''}
-                  onValueChange={(value) => handleSelectChange('category', value)}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {categories.map((category) => (
-                      <SelectItem key={category} value={category.toLowerCase()}>
-                        {category}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+  <Label htmlFor="category">Categoria</Label>
+  {showNewCategory ? (
+    <div className="flex space-x-2">
+      <Input
+        id="newCategory"
+        name="newCategory"
+        value={newCategory}
+        onChange={(e) => setNewCategory(e.target.value)}
+        placeholder="Nova categoria"
+      />
+      <Button 
+        type="button" 
+        size="sm" 
+        onClick={handleAddCategory}
+      >
+        +
+      </Button>
+    </div>
+  ) : (
+    <div className="relative">
+      <Select
+        value={transaction.category || ''}
+        onValueChange={(value) => handleSelectChange('category', value)}
+      >
+        <SelectTrigger>
+          <SelectValue placeholder="Selecione" />
+        </SelectTrigger>
+        <SelectContent>
+          {categories.map((category) => (
+            <SelectItem key={category} value={category.toLowerCase()}>
+              {category}
+            </SelectItem>
+          ))}
+          <div className="py-2 px-2 border-t">
+            <Button 
+              type="button" 
+              variant="ghost" 
+              size="sm" 
+              className="w-full flex items-center justify-center gap-1"
+              onClick={() => setShowNewCategory(true)}
+            >
+              <PlusCircle className="h-4 w-4 mr-1" />
+              Adicionar categoria
+            </Button>
+          </div>
+        </SelectContent>
+      </Select>
+    </div>
+  )}
+</div>
+
             </div>
 
             <div className="space-y-2">
