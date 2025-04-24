@@ -23,6 +23,7 @@ import CategoryCharts from '@/components/ui/categoria-chart';
 import { ModeToggle } from '@/components/ui/themeSwitcher';
 import RecurringExpenseTracker from '@/components/ui/RecurringExpenseTracker';
 import { Card } from '@/components/ui/card';
+import { TutorialGuide } from '@/components/ui/tutorialGuide';
 
 
 export default function HomePage() {
@@ -103,10 +104,11 @@ export default function HomePage() {
   // };
 
   return (
-    <div className="container mx-auto py-8 px-24">
+    <div className="container mx-auto py-8 px-32">
      <div className="flex justify-between items-center mb-6">
   <h1 className="text-3xl font-bold">Controle Financeiro 2025</h1>
   <div className="flex gap-2">
+  <TutorialGuide />
     <ModeToggle/>
     <Button 
       variant="outline" 

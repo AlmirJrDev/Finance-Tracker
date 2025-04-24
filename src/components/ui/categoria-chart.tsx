@@ -141,7 +141,7 @@ export default function CategoryCharts({ data, allMonthsData }: CategoryChartsPr
       
 
       {categoryData.length > 0 ? (
-              <ChartContainer config={chartConfig} className="h-90 flex-1">
+              <ChartContainer config={chartConfig} className="h-80 flex-1">
                 <PieChart>
                   <Pie 
                     data={categoryData} 
@@ -169,7 +169,7 @@ export default function CategoryCharts({ data, allMonthsData }: CategoryChartsPr
             )}
 
 {categoryData.length > 0 ? (
-              <ChartContainer config={chartConfig} className="h-90 flex-1">
+              <ChartContainer config={chartConfig} className="h-80 flex-1">
                 <BarChart 
                   data={categoryData}
                   margin={{ top: 20, right: 30, left: 30, bottom: 5 }}
