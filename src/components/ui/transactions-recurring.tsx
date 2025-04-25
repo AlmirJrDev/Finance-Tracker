@@ -29,7 +29,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { Plus, Calendar, Edit, MoreVertical, Trash2, PlusCircle } from 'lucide-react';
+import { Plus, Calendar, Edit, MoreVertical, Trash2, PlusCircle, CalendarRange } from 'lucide-react';
 import { Transaction } from '@/types/finance';
 import { addCategory, loadCategories } from '@/lib/categories';
 import { toast } from 'sonner';
@@ -62,8 +62,12 @@ export default function RecurringTransactions({
   const [editTransaction, setEditTransaction] = useState<RecurringTransaction | null>(null);
   const [pendingTransactions, setPendingTransactions] = useState<Transaction[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
-const [newCategory, setNewCategory] = useState<string>('');
-const [showNewCategory, setShowNewCategory] = useState<boolean>(false);
+  const [newCategory, setNewCategory] = useState<string>('');
+  const [showNewCategory, setShowNewCategory] = useState<boolean>(false);
+  
+  // Estado para o diálogo de confirmação de aplicação futura
+  const [showApplyConfirm, setShowApplyConfirm] = useState(false);
+  const [futurePendingTransactions, setFuturePendingTransactions] = useState<Transaction[]>([]);
   
   // Formulário
   const [transaction, setTransaction] = useState<Partial<RecurringTransaction>>({
@@ -212,9 +216,79 @@ const [showNewCategory, setShowNewCategory] = useState<boolean>(false);
   const handleApplyTransactions = () => {
     if (pendingTransactions.length > 0) {
       onAddTransactions(pendingTransactions);
-      alert(`${pendingTransactions.length} transações aplicadas com sucesso!`);
+      toast.success(`${pendingTransactions.length} transações aplicadas ao mês atual.`);
     } else {
-      alert('Não há transações pendentes para aplicar.');
+      toast.error('Não há transações pendentes para aplicar.');
+    }
+  };
+
+  // Função para gerar transações para um intervalo de meses
+  const generateFutureTransactions = () => {
+    const activeTransactions = recurringTransactions.filter(t => t.active);
+    const currentDate = new Date();
+    const currentMonth = currentDate.getMonth();
+    const currentYear = currentDate.getFullYear();
+    
+    // Determinando o período final (final de 2026)
+    const endYear = 2026;
+    const endMonth = 11; // Dezembro (0-11)
+    
+    const allFutureTransactions: Transaction[] = [];
+    
+    // Para cada mês, de agora até Dezembro de 2026
+    for (let year = currentYear; year <= endYear; year++) {
+      // Definir o mês inicial com base no ano
+      const startMonth = year === currentYear ? currentMonth : 0;
+      
+      // Definir o mês final com base no ano
+      const finalMonth = year === endYear ? endMonth : 11;
+      
+      for (let month = startMonth; month <= finalMonth; month++) {
+        const daysInMonth = new Date(year, month + 1, 0).getDate();
+        
+        // Para cada transação recorrente ativa
+        activeTransactions.forEach(recTrans => {
+          // Ajusta o dia para não exceder os dias do mês
+          const day = Math.min(recTrans.dayOfMonth, daysInMonth);
+          
+          // Cria uma transação para este mês/ano
+          allFutureTransactions.push({
+            id: `pending-${recTrans.id}-${month}-${year}`,
+            date: new Date(year, month, day),
+            description: recTrans.description,
+            amount: recTrans.amount,
+            type: recTrans.type,
+            category: recTrans.category,
+            note: `[Automático] ${recTrans.note || ''}`,
+            isRecurring: true,
+            recurringId: recTrans.id
+          } as Transaction);
+        });
+      }
+    }
+    
+    return allFutureTransactions;
+  };
+
+  // Função para preparar a aplicação futura
+  const prepareApplyFuture = () => {
+    const futureTransactions = generateFutureTransactions();
+    setFuturePendingTransactions(futureTransactions);
+    setShowApplyConfirm(true);
+  };
+
+  // Função para aplicar transações futuras
+  const handleApplyFutureTransactions = () => {
+    if (futurePendingTransactions.length > 0) {
+      onAddTransactions(futurePendingTransactions);
+      const months = new Set(futurePendingTransactions.map(t => 
+        `${t.date.getMonth()}-${t.date.getFullYear()}`
+      )).size;
+      
+      toast.success(`Transações recorrentes aplicadas com sucesso!`, {
+        description: `${futurePendingTransactions.length} transações foram aplicadas em ${months} meses.`
+      });
+      setShowApplyConfirm(false);
     }
   };
 
@@ -247,6 +321,15 @@ const [showNewCategory, setShowNewCategory] = useState<boolean>(false);
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>Transações Recorrentes</CardTitle>
           <div className="flex gap-2">
+            <Button 
+              variant="outline" 
+              onClick={prepareApplyFuture}
+              disabled={pendingTransactions.length === 0}
+              className="flex items-center gap-1"
+            >
+              <CalendarRange className="h-4 w-4" />
+              Aplicar a Todos os Meses
+            </Button>
             <Button 
               variant="outline" 
               onClick={handleApplyTransactions}
@@ -407,57 +490,56 @@ const [showNewCategory, setShowNewCategory] = useState<boolean>(false);
               </div>
 
               <div className="space-y-2">
-  <Label htmlFor="category">Categoria</Label>
-  {showNewCategory ? (
-    <div className="flex space-x-2">
-      <Input
-        id="newCategory"
-        name="newCategory"
-        value={newCategory}
-        onChange={(e) => setNewCategory(e.target.value)}
-        placeholder="Nova categoria"
-      />
-      <Button 
-        type="button" 
-        size="sm" 
-        onClick={handleAddCategory}
-      >
-        +
-      </Button>
-    </div>
-  ) : (
-    <div className="relative">
-      <Select
-        value={transaction.category || ''}
-        onValueChange={(value) => handleSelectChange('category', value)}
-      >
-        <SelectTrigger>
-          <SelectValue placeholder="Selecione" />
-        </SelectTrigger>
-        <SelectContent>
-          {categories.map((category) => (
-            <SelectItem key={category} value={category.toLowerCase()}>
-              {category}
-            </SelectItem>
-          ))}
-          <div className="py-2 px-2 border-t">
-            <Button 
-              type="button" 
-              variant="ghost" 
-              size="sm" 
-              className="w-full flex items-center justify-center gap-1"
-              onClick={() => setShowNewCategory(true)}
-            >
-              <PlusCircle className="h-4 w-4 mr-1" />
-              Adicionar categoria
-            </Button>
-          </div>
-        </SelectContent>
-      </Select>
-    </div>
-  )}
-</div>
-
+                <Label htmlFor="category">Categoria</Label>
+                {showNewCategory ? (
+                  <div className="flex space-x-2">
+                    <Input
+                      id="newCategory"
+                      name="newCategory"
+                      value={newCategory}
+                      onChange={(e) => setNewCategory(e.target.value)}
+                      placeholder="Nova categoria"
+                    />
+                    <Button 
+                      type="button" 
+                      size="sm" 
+                      onClick={handleAddCategory}
+                    >
+                      +
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="relative">
+                    <Select
+                      value={transaction.category || ''}
+                      onValueChange={(value) => handleSelectChange('category', value)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {categories.map((category) => (
+                          <SelectItem key={category} value={category.toLowerCase()}>
+                            {category}
+                          </SelectItem>
+                        ))}
+                        <div className="py-2 px-2 border-t">
+                          <Button 
+                            type="button" 
+                            variant="ghost" 
+                            size="sm" 
+                            className="w-full flex items-center justify-center gap-1"
+                            onClick={() => setShowNewCategory(true)}
+                          >
+                            <PlusCircle className="h-4 w-4 mr-1" />
+                            Adicionar categoria
+                          </Button>
+                        </div>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+              </div>
             </div>
 
             <div className="space-y-2">
@@ -484,6 +566,62 @@ const [showNewCategory, setShowNewCategory] = useState<boolean>(false);
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Diálogo de confirmação para aplicar a todos os meses futuros */}
+      <Dialog open={showApplyConfirm} onOpenChange={setShowApplyConfirm}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Aplicar a Todos os Meses Futuros</DialogTitle>
+            <DialogDescription>
+              Esta ação irá aplicar todas as transações recorrentes ativas para todos os meses futuros, até dezembro de 2026.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="py-4">
+            <div className="rounded-md bg-yellow-50 p-4 mb-4">
+              <div className="flex">
+                <div className="flex-shrink-0">
+                  <svg className="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                    <path fillRule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
+                  </svg>
+                </div>
+                <div className="ml-3">
+                  <h3 className="text-sm font-medium text-yellow-800">Atenção</h3>
+                  <div className="mt-2 text-sm text-yellow-700">
+                    <p>
+                      Isso irá criar aproximadamente {futurePendingTransactions.length} transações. Este processo não pode ser desfeito facilmente.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <p className="text-sm text-gray-500 mb-4">
+              Detalhes:
+            </p>
+            <ul className="list-disc pl-5 text-sm text-gray-500 mb-4 space-y-1">
+              <li>Total de transações a serem criadas: {futurePendingTransactions.length}</li>
+              <li>Total de meses: {new Set(futurePendingTransactions.map(t => 
+                `${t.date.getMonth()}-${t.date.getFullYear()}`
+              )).size}</li>
+              <li>Período: De {new Date().toLocaleDateString('pt-BR', {month: 'long', year: 'numeric'})} até Dezembro de 2026</li>
+            </ul>
+
+            <p className="text-sm text-gray-500">
+              Deseja prosseguir com esta ação?
+            </p>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowApplyConfirm(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleApplyFutureTransactions}>
+              Aplicar a Todos os Meses
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </>

@@ -13,8 +13,9 @@ export function loadData(): MonthlyData[] {
       const data = JSON.parse(savedData);
       
       // Converte as string de datas de volta para objetos Date
-      return data.map((month: any) => ({
+      const parsedData = data.map((month: any) => ({
         ...month,
+        initialBalance: month.initialBalance || 0, // Garante que initialBalance exista
         dailyBalances: month.dailyBalances.map((day: any) => ({
           ...day,
           date: new Date(day.date),
@@ -24,6 +25,9 @@ export function loadData(): MonthlyData[] {
           }))
         }))
       }));
+
+      // Aplica o carryover entre meses após carregar os dados
+      return ensureMonthContinuity(parsedData);
     }
     return [];
   } catch (error) {
@@ -43,6 +47,77 @@ export function saveData(data: MonthlyData[]): void {
   }
 }
 
+// Nova função para garantir a continuidade entre meses
+export function ensureMonthContinuity(monthsData: MonthlyData[]): MonthlyData[] {
+  if (!monthsData || monthsData.length <= 1) return monthsData;
+  
+  // Ordena os meses cronologicamente
+  const sortedMonths = [...monthsData].sort((a, b) => {
+    if (a.year !== b.year) return a.year - b.year;
+    return a.month - b.month;
+  });
+  
+  // Garante que o primeiro mês tenha initialBalance (mesmo que seja 0)
+  if (sortedMonths[0].initialBalance === undefined) {
+    sortedMonths[0].initialBalance = 0;
+  }
+  
+  // Propaga o saldo final de cada mês para o inicial do próximo
+  for (let i = 0; i < sortedMonths.length - 1; i++) {
+    const currentMonth = sortedMonths[i];
+    const nextMonth = sortedMonths[i + 1];
+    
+    // Calcula o saldo final do mês atual
+    let finalBalance = 0;
+    
+    // Se houver dias registrados, usa o último saldo diário
+    if (currentMonth.dailyBalances.length > 0) {
+      const sortedDays = [...currentMonth.dailyBalances]
+        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+      finalBalance = sortedDays[sortedDays.length - 1].balance;
+    } else {
+      // Se não houver dias, usa saldo inicial + performance
+      finalBalance = (currentMonth.initialBalance || 0) + currentMonth.performance;
+    }
+    
+    // Define o saldo inicial do próximo mês
+    nextMonth.initialBalance = finalBalance;
+    
+    // Recalcula os saldos para o próximo mês com o novo saldo inicial
+    updateMonthWithInitialBalance(nextMonth);
+  }
+  
+  return sortedMonths;
+}
+
+// Função para recalcular os saldos com base no saldo inicial
+function updateMonthWithInitialBalance(monthData: MonthlyData): void {
+  // Garante que initialBalance sempre tenha um valor
+  if (monthData.initialBalance === undefined) {
+    monthData.initialBalance = 0;
+  }
+  
+  // Se não houver dias registrados, não há o que recalcular
+  if (monthData.dailyBalances.length === 0) return;
+  
+  // Ordena os dias por data
+  monthData.dailyBalances.sort((a: DailyBalance, b: DailyBalance) => {
+    return new Date(a.date).getTime() - new Date(b.date).getTime();
+  });
+  
+  // Recalcula o saldo para cada dia, começando do saldo inicial
+  let runningBalance = monthData.initialBalance;
+  
+  monthData.dailyBalances.forEach((day: DailyBalance) => {
+    // Calcula o saldo líquido do dia (receitas - despesas)
+    const dailyNet = day.income - day.expense;
+    runningBalance += dailyNet;
+    day.balance = runningBalance;
+  });
+  
+  // Atualiza a performance do mês (diferença entre receitas e despesas)
+  monthData.performance = monthData.totalIncome - monthData.totalExpense;
+}
 // Adiciona ou edita uma transação em um mês específico
 export function addTransaction(
   allMonthsData: MonthlyData[],
@@ -99,9 +174,27 @@ export function addTransaction(
   
   // Se o mês não existir, cria um novo
   if (!monthData) {
+    // Procura o mês anterior para pegar o saldo final como inicial
+    const previousMonthData = findPreviousMonth(updatedData, month, year);
+    let initialBalance = 0;
+    
+    if (previousMonthData) {
+      // Calcula o saldo final do mês anterior
+      if (previousMonthData.dailyBalances.length > 0) {
+        const sortedDays = [...previousMonthData.dailyBalances].sort(
+          (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
+        );
+        initialBalance = sortedDays[sortedDays.length - 1].balance;
+      } else {
+        // Garante que initialBalance nunca seja undefined
+        initialBalance = (previousMonthData.initialBalance || 0) + previousMonthData.performance;
+      }
+    }
+    
     monthData = {
       month,
       year,
+      initialBalance, // Já garantimos que tem valor acima
       totalIncome: 0,
       totalExpense: 0,
       performance: 0,
@@ -109,7 +202,7 @@ export function addTransaction(
         date: new Date(year, month, i + 1),
         income: 0,
         expense: 0,
-        balance: 0,
+        balance: initialBalance, // Inicializa com o saldo inicial do mês
         dailyTransactions: []
       }))
     };
@@ -138,13 +231,16 @@ export function addTransaction(
     }
   }
   
-  // Recalcula os saldos
-  updateBalances(monthData);
+  // Recalcula os saldos com base no saldo inicial
+  updateMonthWithInitialBalance(monthData);
+  
+  // Aplica o carryover para os meses futuros
+  const result = ensureMonthContinuity(updatedData);
   
   // Salva os dados atualizados
-  saveData(updatedData);
+  saveData(result);
   
-  return updatedData;
+  return result;
 }
 
 // Remove uma transação
@@ -196,17 +292,40 @@ export function removeTransaction(
   // Remove a transação
   monthData.dailyBalances[dayIndex].dailyTransactions.splice(transactionIndex, 1);
   
-  // Recalcula os saldos
-  updateBalances(monthData);
+  // Recalcula os saldos do mês atual
+  updateMonthWithInitialBalance(monthData);
+  
+  // Aplica o carryover para os meses futuros
+  const result = ensureMonthContinuity(updatedData);
   
   // Salva os dados atualizados
-  saveData(updatedData);
+  saveData(result);
   
-  return updatedData;
+  return result;
 }
 
-// Recalcula os saldos diários
+// Função auxiliar para encontrar o mês anterior
+function findPreviousMonth(data: MonthlyData[], month: number, year: number): MonthlyData | undefined {
+  let prevMonth = month - 1;
+  let prevYear = year;
+  
+  if (prevMonth < 0) {
+    prevMonth = 11; // Dezembro
+    prevYear -= 1;
+  }
+  
+  return data.find(m => m.month === prevMonth && m.year === prevYear);
+}
+
+// Recalcula os saldos diários (mantendo compatibilidade com o código existente)
 function updateBalances(monthData: MonthlyData): void {
+  // Se o mês tem um saldo inicial definido, use-o
+  if (monthData.initialBalance !== undefined) {
+    updateMonthWithInitialBalance(monthData);
+    return;
+  }
+  
+  // Comportamento original para compatibilidade
   let runningBalance = 0;
   
   // Ordena os dias por data
@@ -278,21 +397,35 @@ export function applyRecurringTransactions(
       // Atualiza o saldo do mês
       existingMonth.performance = existingMonth.totalIncome - existingMonth.totalExpense;
       
-      // Reordena por data e recalcula os saldos acumulados
-      existingMonth.dailyBalances.sort((a: DailyBalance, b: DailyBalance) => 
-        new Date(a.date).getTime() - new Date(b.date).getTime()
+      // Recalcula os saldos com o saldo inicial
+      updateMonthWithInitialBalance(existingMonth);
+    } else {
+      // Encontrar o mês anterior para pegar o saldo inicial
+      const previousMonthData = findPreviousMonth(
+        updatedData, 
+        transaction.date.getMonth(), 
+        transaction.date.getFullYear()
       );
       
-      let runningBalance = 0;
-      for (const day of existingMonth.dailyBalances) {
-        runningBalance += (day.income - day.expense);
-        day.balance = runningBalance;
+      let initialBalance = 0;
+      if (previousMonthData) {
+        // Calcula o saldo final do mês anterior
+        if (previousMonthData.dailyBalances.length > 0) {
+          const sortedDays = [...previousMonthData.dailyBalances].sort(
+            (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
+          );
+          initialBalance = sortedDays[sortedDays.length - 1].balance;
+        } else {
+          // Garante que initialBalance nunca seja undefined
+          initialBalance = (previousMonthData.initialBalance || 0) + previousMonthData.performance;
+        }
       }
-    } else {
+      
       // Cria um novo mês se não existir
       const newMonthData: MonthlyData = {
         month: transaction.date.getMonth(),
         year: transaction.date.getFullYear(),
+        initialBalance, // Já garantimos que tem valor acima
         totalIncome: transaction.type === 'entrada' ? transaction.amount : 0,
         totalExpense: transaction.type === 'saída' ? transaction.amount : 0,
         performance: transaction.type === 'entrada' ? transaction.amount : -transaction.amount,
@@ -300,7 +433,7 @@ export function applyRecurringTransactions(
           date: new Date(transaction.date),
           income: transaction.type === 'entrada' ? transaction.amount : 0,
           expense: transaction.type === 'saída' ? transaction.amount : 0,
-          balance: transaction.type === 'entrada' ? transaction.amount : -transaction.amount,
+          balance: initialBalance + (transaction.type === 'entrada' ? transaction.amount : -transaction.amount),
           dailyTransactions: [{ ...transaction, date: new Date(transaction.date) }]
         }]
       };
@@ -309,10 +442,13 @@ export function applyRecurringTransactions(
     }
   }
   
-  // Salva os dados atualizados
-  saveData(updatedData);
+  // Aplica o carryover para garantir a continuidade dos saldos
+  const result = ensureMonthContinuity(updatedData);
   
-  return updatedData;
+  // Salva os dados atualizados
+  saveData(result);
+  
+  return result;
 }
 
 // Função para carregar transações recorrentes

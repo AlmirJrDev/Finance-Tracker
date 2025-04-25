@@ -33,11 +33,12 @@ export type DailyBalance = {
   dailyTransactions: Transaction[];
 };
 
-export type MonthlyData = {
+export interface MonthlyData {
   month: number;
   year: number;
+  initialBalance?: number; // Saldo inicial do mês (vindo do mês anterior)
   totalIncome: number;
   totalExpense: number;
   performance: number;
   dailyBalances: DailyBalance[];
-};
+}

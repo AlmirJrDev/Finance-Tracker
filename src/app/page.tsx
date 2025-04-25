@@ -129,8 +129,7 @@ export default function HomePage() {
   </div>
 </div>
       
-      <MonthSelector 
-        availableMonths={availableMonths}
+<MonthSelector 
         currentMonth={selectedMonth}
         currentYear={selectedYear}
         onMonthChange={handleMonthChange}
@@ -144,15 +143,15 @@ export default function HomePage() {
   />
 ) : monthlyData ? (
   <>
-    <MonthlySummary data={monthlyData} />
+    <MonthlySummary data={monthlyData} allMonthsData={allMonthsData} />
     <CategoryCharts data={monthlyData} allMonthsData={allMonthsData} />
     <DailyAllowance data={monthlyData} />
-<RecurringExpenseTracker data={monthlyData} />
-<TransactionsTable 
-  dailyBalances={monthlyData.dailyBalances} 
-  onEditTransaction={handleEditTransaction}
-  onDeleteTransaction={handleDeleteTransaction}
-/>
+    <RecurringExpenseTracker data={monthlyData} />
+    <TransactionsTable 
+      dailyBalances={monthlyData.dailyBalances} 
+      onEditTransaction={handleEditTransaction}
+      onDeleteTransaction={handleDeleteTransaction}
+    />
   </>
 ) : (
   

@@ -1,5 +1,3 @@
-// Create a new file at: @/components/ui/tutorial-guide.tsx
-
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import {
@@ -8,14 +6,13 @@ import {
   DialogHeader,
   DialogTitle,
   DialogDescription,
-  DialogFooter,
 } from '@/components/ui/dialog';
 import { 
   Card, 
   CardContent,
   CardFooter
 } from '@/components/ui/card';
-import {  ArrowRight, ArrowLeft, X, Check, AlertCircle, Repeat, ChartBar, DollarSign, CalendarRange, Clock, List, Folder, MessageCircleQuestion } from 'lucide-react';
+import {  ArrowRight, ArrowLeft, Check, AlertCircle, Repeat, ChartBar, DollarSign, CalendarRange, Clock, List, Folder, MessageCircleQuestion } from 'lucide-react';
 
 interface TutorialStep {
   title: string;
@@ -69,7 +66,7 @@ export function TutorialGuide() {
             </p>
             <p className="text-sm italic mt-1">
               <AlertCircle className="h-3 w-3 inline mr-1" />
-              <strong>Importante:</strong> Não inclua valores incertos, como comissões ou "talvez recebo".
+              <strong>Importante:</strong> Não inclua valores incertos, como comissões ou &quot;talvez recebo&quot;.
             </p>
           </div>
           
@@ -124,14 +121,14 @@ export function TutorialGuide() {
       description: "Configure seus gastos e receitas fixas mensais",
       icon: <Repeat className="h-8 w-8 text-blue-500" />,
       content: (
-        <div className="space-y-4">
+        <div className="space-y-4 ">
           <p>
             Agora que você tem o balanço fixo em mãos, é hora de registrar no sistema:
           </p>
-          
+          <div className='grid grid-cols-2 justify-center gap-4 divide-x'>
           <ol className="list-decimal ml-5 space-y-2">
-            <li>Vá até a seção <strong>"Transações Recorrentes"</strong> (botão no topo da página)</li>
-            <li>Clique em <strong>"Nova Recorrente"</strong></li>
+            <li>Vá até a seção <strong>&quot;Transações Recorrentes&quot;</strong> (botão no topo da página)</li>
+            <li>Clique em <strong>&quot;Nova Recorrente&quot;</strong></li>
             <li>
               Preencha o formulário com:
               <ul className="list-disc ml-5 mt-1">
@@ -147,15 +144,16 @@ export function TutorialGuide() {
             <li>Repita para cada entrada ou saída fixa</li>
           </ol>
           
-          <div className="bg-green-100 dark:bg-green-900/30 p-4 rounded-md">
+          <div className="bg-green-100 dark:bg-green-900/30 p-4 rounded-md max-h-fit">
             <p className="flex items-center gap-2">
               <Check className="h-5 w-5 text-green-500" />
-              Após cadastrar tudo, clique em <strong>"Aplicar ao Mês Atual"</strong>
+              Após cadastrar tudo, clique em <strong>&quot;Aplicar ao Mês Atual&quot;</strong>
             </p>
             <p className="mt-2">
               Isso lançará todas as transações fixas no mês atual automaticamente. Nos meses 
               seguintes, você não precisará repetir o processo!
             </p>
+          </div>
           </div>
         </div>
       )
@@ -216,6 +214,9 @@ export function TutorialGuide() {
             O sistema calcula automaticamente quanto você pode gastar por dia para manter o orçamento equilibrado:
           </p>
           
+          <div>
+            
+          </div>
           <div className="bg-primary/10 p-4 rounded-md">
             <h4 className="font-medium flex items-center gap-2">
               🧮 Fórmula do Limite Diário
@@ -271,7 +272,7 @@ export function TutorialGuide() {
           </p>
           
           <ol className="list-decimal ml-5 space-y-1">
-            <li>Localize a seção "Planejador de Gastos" na tela principal</li>
+            <li>Localize a seção &quot;Planejador de Gastos&quot; na tela principal</li>
             <li>Insira o valor do item que deseja comprar</li>
             <li>O sistema calculará automaticamente quantos dias você precisa economizar</li>
             <li>Você também pode ajustar o valor diário a economizar para calcular em quanto tempo atingirá sua meta</li>
@@ -300,10 +301,10 @@ export function TutorialGuide() {
             <li>Informe o valor mensal estimado (ex: R$ 450)</li>
             <li>O sistema divide automaticamente esse valor pelos dias do mês (ex: R$ 15/dia)</li>
             <li>
-              Cada dia funciona como uma <strong>"raspadinha"</strong>:
+              Cada dia funciona como uma <strong>&quot;raspadinha&quot;</strong>:
               <ul className="list-disc ml-5 mt-1">
                 <li>Se você gastar, o valor do dia é consumido</li>
-                <li>Se <strong>não</strong> gastar, você pode clicar e marcar como <strong>"Economizado"</strong></li>
+                <li>Se <strong>não</strong> gastar, você pode clicar e marcar como <strong>&quot;Economizado&quot;</strong></li>
               </ul>
             </li>
           </ol>
@@ -319,7 +320,7 @@ export function TutorialGuide() {
           </div>
           
           <p>
-            Este sistema de "raspadinha financeira" é uma maneira divertida e eficaz de controlar 
+            Este sistema de &quot;raspadinha financeira&quot; é uma maneira divertida e eficaz de controlar 
             gastos variáveis, criando um incentivo visual para a economia diária.
           </p>
         </div>
@@ -353,7 +354,7 @@ export function TutorialGuide() {
           <ul className="list-disc ml-5 space-y-1">
             <li>Para <strong>editar</strong> uma transação, clique no ícone de lápis</li>
             <li>Para <strong>excluir</strong> uma transação, clique no ícone de lixeira</li>
-            <li>Para <strong>adicionar</strong> uma nova transação, use o botão "Nova Transação" no topo da página</li>
+            <li>Para <strong>adicionar</strong> uma nova transação, use o botão &quot;Nova Transação&quot; no topo da página</li>
           </ul>
           
           <p>
@@ -377,7 +378,7 @@ export function TutorialGuide() {
           <div className="bg-primary/10 p-4 rounded-md">
             <h4 className="font-medium">Como gerenciar categorias:</h4>
             <ol className="list-decimal ml-5 mt-2">
-              <li>Clique no botão <strong>"Gerenciar Categorias"</strong> no topo da página</li>
+              <li>Clique no botão <strong>&quot;Gerenciar Categorias&quot;</strong> no topo da página</li>
               <li>Na janela que se abre, você verá todas as categorias existentes</li>
               <li>Para <strong>adicionar</strong> uma nova categoria, preencha o nome e selecione um ícone</li>
               <li>Para <strong>editar</strong> uma categoria existente, clique no ícone de edição</li>
@@ -441,16 +442,14 @@ export function TutorialGuide() {
       </Button>
 
       <Dialog open={isOpen} onOpenChange={setIsOpen}>
-        <DialogContent className="sm:max-w-md md:max-w-lg lg:max-w-3xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-md md:max-w-lg lg:max-w-6xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <div className="flex justify-between items-center">
               <DialogTitle className="flex items-center gap-2 text-xl">
                 {tutorialSteps[currentStep].icon}
                 {tutorialSteps[currentStep].title}
               </DialogTitle>
-              <Button variant="ghost" size="icon" onClick={() => setIsOpen(false)}>
-                <X className="h-4 w-4" />
-              </Button>
+       
             </div>
             <DialogDescription className="text-base">
               {tutorialSteps[currentStep].description}
