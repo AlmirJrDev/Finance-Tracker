@@ -123,13 +123,13 @@ export default function CategoryCharts({ data, allMonthsData }: CategoryChartsPr
           />
         </div>
       </CardHeader>
-      <CardContent className={`flex w-full  justify-between items-center  ${categoryData.length > 0 ? 'divide-x' : ''}`}>
+      <CardContent className={`flex w-full p-2 gap-2  justify-between flex-col items-center xl:flex-row    ${categoryData.length > 0 ? 'xl:divide-x' : ''}`}>
 
       
 
       {categoryData.length > 0 ? (
-              <ChartContainer config={chartConfig} className="h-80 flex-1">
-                <PieChart>
+              <ChartContainer config={chartConfig} className="h-68 2xl:h-80 flex-1">
+                <PieChart >
                   <Pie 
                     data={categoryData} 
                     dataKey="value" 
@@ -146,7 +146,7 @@ export default function CategoryCharts({ data, allMonthsData }: CategoryChartsPr
                   <ChartTooltip
                     content={<ChartTooltipContent nameKey="visitors" hideLabel />}
                   />
-                  <Legend layout="horizontal" align="center" verticalAlign="bottom" />
+                  <Legend layout="horizontal" align="center" verticalAlign="bottom"  />
                 </PieChart>
               </ChartContainer>
             ) : (
@@ -156,7 +156,7 @@ export default function CategoryCharts({ data, allMonthsData }: CategoryChartsPr
             )}
 
 {categoryData.length > 0 ? (
-              <ChartContainer config={chartConfig} className="h-80 flex-1">
+              <ChartContainer config={chartConfig} className="h-64 2xl:h-80  flex-1">
                 <BarChart 
                   data={categoryData}
                   margin={{ top: 20, right: 30, left: 30, bottom: 5 }}

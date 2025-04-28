@@ -30,7 +30,7 @@ interface CategoryBudgetManagerProps {
   allMonthsData: MonthlyData[];
 }
 
-export default function CategoryBudgetManager({ data, allMonthsData }: CategoryBudgetManagerProps) {
+export default function CategoryBudgetManager({ data }: CategoryBudgetManagerProps) {
   const [budgetLimits, setBudgetLimits] = useState<CategoryBudget[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string>('');
   const [budgetLimit, setBudgetLimit] = useState<string>('');

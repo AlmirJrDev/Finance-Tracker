@@ -102,7 +102,7 @@ export default function HomePage() {
   // };
 
   return (
-    <div className="container mx-auto py-8 px-32">
+    <div className="container mx-auto py-4  lg:py-8 lg:px-32">
      <div className="flex justify-between items-center mb-6">
   <h1 className="text-3xl font-bold">Controle Financeiro 2025</h1>
   <div className="flex gap-2">
@@ -112,32 +112,44 @@ export default function HomePage() {
  
   </div>
 </div>
-<Card className="w-full  flex justify-center mb-4">
-<CardContent className=" flex justify-between items-center "><MonthSelector 
-        currentMonth={selectedMonth}
-        currentYear={selectedYear}
-        onMonthChange={handleMonthChange}
-      />
+<Card className="w-full mb-4">
+  <CardContent className="p-4">
+    <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
 
-      <div className='flex gap-2'>
-         <Button 
-      variant="outline" 
-      onClick={() => setShowCategoryManager(true)}
-    >
-      Gerenciar Categorias
-    </Button>
-    <Button 
-      variant="outline" 
-      onClick={() => setShowRecurring(!showRecurring)}
-    >
-      {showRecurring ? 'Voltar ao Resumo' : 'Transações Recorrentes'}
-    </Button>
-    <Button onClick={handleAddTransaction} className="flex items-center gap-2">
-      <Plus className="h-4 w-4" />
-      Nova Transação
-    </Button>
+      <div className="flex justify-center md:justify-start">
+        <MonthSelector 
+          currentMonth={selectedMonth}
+          currentYear={selectedYear}
+          onMonthChange={handleMonthChange}
+        />
+      </div>
+      
+   
+      <div className="flex flex-col sm:flex-row gap-2">
+        <Button 
+          variant="outline" 
+          onClick={() => setShowCategoryManager(true)}
+          className="text-sm"
+        >
+          Gerenciar Categorias
+        </Button>
+        <Button 
+          variant="outline" 
+          onClick={() => setShowRecurring(!showRecurring)}
+          className="text-sm"
+        >
+          {showRecurring ? 'Voltar ao Resumo' : 'Transações Recorrentes'}
+        </Button>
+        <Button 
+          onClick={handleAddTransaction} 
+          className="flex items-center justify-center gap-1 text-sm"
+        >
+          <Plus className="h-4 w-4" />
+          <span className="sm:inline">Nova Transação</span>
+        </Button>
+      </div>
     </div>
-      </CardContent>
+  </CardContent>
 </Card>
 
       
