@@ -34,7 +34,6 @@ import { Transaction } from '@/types/finance';
 import { addCategory, loadCategories } from '@/lib/categories';
 import { toast } from 'sonner';
 
-// Definição do tipo para transações recorrentes
 export type RecurringTransaction = {
   id: string;
   description: string;
@@ -42,8 +41,8 @@ export type RecurringTransaction = {
   type: 'entrada' | 'saída';
   category?: string;
   note?: string;
-  dayOfMonth: number; // Dia do mês em que a transação ocorre
-  active: boolean;    // Indica se a transação está ativa
+  dayOfMonth: number; 
+  active: boolean;  
 };
 
 type RecurringTransactionsProps = {
@@ -64,12 +63,9 @@ export default function RecurringTransactions({
   const [categories, setCategories] = useState<string[]>([]);
   const [newCategory, setNewCategory] = useState<string>('');
   const [showNewCategory, setShowNewCategory] = useState<boolean>(false);
-  
-  // Estado para o diálogo de confirmação de aplicação futura
   const [showApplyConfirm, setShowApplyConfirm] = useState(false);
   const [futurePendingTransactions, setFuturePendingTransactions] = useState<Transaction[]>([]);
-  
-  // Formulário
+
   const [transaction, setTransaction] = useState<Partial<RecurringTransaction>>({
     id: '',
     description: '',
@@ -81,7 +77,6 @@ export default function RecurringTransactions({
     active: true,
   });
 
-  // Carrega transações recorrentes do localStorage
   useEffect(() => {
     const storedRecurring = localStorage.getItem('recurringTransactions');
     if (storedRecurring) {
@@ -89,20 +84,17 @@ export default function RecurringTransactions({
     }
   }, []);
 
-  // Salva transações recorrentes no localStorage quando houver mudanças
   useEffect(() => {
     if (recurringTransactions.length > 0) {
       localStorage.setItem('recurringTransactions', JSON.stringify(recurringTransactions));
     }
   }, [recurringTransactions]);
 
-  // Gera transações pendentes para o mês selecionado
   useEffect(() => {
     const activeTransactions = recurringTransactions.filter(t => t.active);
     const daysInMonth = new Date(selectedYear, selectedMonth + 1, 0).getDate();
     
     const newPendingTransactions = activeTransactions.map(recTrans => {
-      // Ajusta o dia para não exceder os dias do mês
       const day = Math.min(recTrans.dayOfMonth, daysInMonth);
       
       return {
@@ -140,8 +132,6 @@ export default function RecurringTransactions({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // Validação
     if (!transaction.description || !transaction.amount || transaction.amount <= 0) {
       toast.error('Por favor, preencha a descrição e um valor válido.');
       return;
@@ -151,8 +141,7 @@ export default function RecurringTransactions({
       toast.error('Por favor, informe um dia do mês válido (1-31).');
       return;
     }
-    
-    // Formata a transação final
+
     const finalTransaction: RecurringTransaction = {
       id: transaction.id || `rec-${Date.now()}`,
       description: transaction.description || '',
@@ -165,12 +154,12 @@ export default function RecurringTransactions({
     };
     
     if (editTransaction) {
-      // Atualiza a transação existente
+
       setRecurringTransactions(prev => 
         prev.map(t => t.id === finalTransaction.id ? finalTransaction : t)
       );
     } else {
-      // Adiciona nova transação
+
       setRecurringTransactions(prev => [...prev, finalTransaction]);
     }
     
@@ -222,36 +211,26 @@ export default function RecurringTransactions({
     }
   };
 
-  // Função para gerar transações para um intervalo de meses
   const generateFutureTransactions = () => {
     const activeTransactions = recurringTransactions.filter(t => t.active);
     const currentDate = new Date();
     const currentMonth = currentDate.getMonth();
     const currentYear = currentDate.getFullYear();
     
-    // Determinando o período final (final de 2026)
     const endYear = 2026;
-    const endMonth = 11; // Dezembro (0-11)
+    const endMonth = 11; 
     
     const allFutureTransactions: Transaction[] = [];
     
-    // Para cada mês, de agora até Dezembro de 2026
     for (let year = currentYear; year <= endYear; year++) {
-      // Definir o mês inicial com base no ano
       const startMonth = year === currentYear ? currentMonth : 0;
-      
-      // Definir o mês final com base no ano
       const finalMonth = year === endYear ? endMonth : 11;
       
       for (let month = startMonth; month <= finalMonth; month++) {
         const daysInMonth = new Date(year, month + 1, 0).getDate();
-        
-        // Para cada transação recorrente ativa
         activeTransactions.forEach(recTrans => {
-          // Ajusta o dia para não exceder os dias do mês
           const day = Math.min(recTrans.dayOfMonth, daysInMonth);
-          
-          // Cria uma transação para este mês/ano
+        
           allFutureTransactions.push({
             id: `pending-${recTrans.id}-${month}-${year}`,
             date: new Date(year, month, day),
@@ -269,15 +248,12 @@ export default function RecurringTransactions({
     
     return allFutureTransactions;
   };
-
-  // Função para preparar a aplicação futura
   const prepareApplyFuture = () => {
     const futureTransactions = generateFutureTransactions();
     setFuturePendingTransactions(futureTransactions);
     setShowApplyConfirm(true);
   };
 
-  // Função para aplicar transações futuras
   const handleApplyFutureTransactions = () => {
     if (futurePendingTransactions.length > 0) {
       onAddTransactions(futurePendingTransactions);
@@ -303,8 +279,7 @@ export default function RecurringTransactions({
     const loadedCategories = loadCategories();
     setCategories(loadedCategories);
   }, []);
-  
-  // Adicione esta função para adicionar categorias personalizadas
+
   const handleAddCategory = () => {
     if (newCategory.trim()) {
       const updatedCategories = addCategory(newCategory.trim());

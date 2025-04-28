@@ -112,24 +112,22 @@ export default function TransactionForm({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
       
-  // Validação básica
-  if (!transaction.description || !transaction.amount || transaction.amount <= 0) {
-    // Substituindo o alert pelo toast
-    toast.error("Erro de validação", {
-   
-      description: "Por favor, preencha a descrição e um valor válido."
-    });
-    return;
-  }
+    // Validação básica
+    if (!transaction.description || !transaction.amount || transaction.amount <= 0) {
+      toast.error("Erro de validação", {
+        description: "Por favor, preencha a descrição e um valor válido."
+      });
+      return;
+    }
       
-    // Formata a transação final
+    // Formata a transação final - certifique-se que a data seja um objeto Date válido
     const finalTransaction: Transaction = {
       id: transaction.id || `trans-${Date.now()}`,
-      date: transaction.date || currentDate,
+      date: transaction.date instanceof Date ? transaction.date : new Date(transaction.date || currentDate),
       description: transaction.description || '',
       amount: transaction.amount || 0,
       type: transaction.type as 'entrada' | 'saída',
-      category: transaction.category || '',
+      category: (transaction.category || '').toLowerCase(), // Normalizar categoria para lowercase
       note: transaction.note,
     };
       

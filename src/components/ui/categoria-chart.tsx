@@ -24,14 +24,11 @@ import {
 import { Label } from "@/components/ui/label";
 import { MonthlyData,  } from '@/types/finance';
 
-// Interface para os dados do gráfico
 interface CategoryDataItem {
   name: string;
   value: number;
   fill: string;
 }
-
-// Interface para tendência
 interface TrendData {
   value: number;
   isUp: boolean;
@@ -50,7 +47,7 @@ const COLORS: string[] = [
 
 interface CategoryChartsProps {
   data: MonthlyData;
-  allMonthsData: MonthlyData[]; // Nova prop para receber todos os meses
+  allMonthsData: MonthlyData[]; 
 }
 
 export default function CategoryCharts({ data, allMonthsData }: CategoryChartsProps) {
@@ -60,14 +57,8 @@ export default function CategoryCharts({ data, allMonthsData }: CategoryChartsPr
   
   useEffect(() => {
     if (!data) return;
-    
-    // Decide qual conjunto de dados processar com base no toggle
     const dataToProcess = showAllMonths ? allMonthsData : [data];
-    
-    // Processa os dados para agrupar por categoria
     const categories: Record<string, number> = {};
-    
-    // Coleta todas as transações (de um mês ou de todos)
     dataToProcess.forEach((monthData) => {
       monthData.dailyBalances.forEach((day) => {
         day.dailyTransactions.forEach((transaction) => {
@@ -81,20 +72,17 @@ export default function CategoryCharts({ data, allMonthsData }: CategoryChartsPr
         });
       });
     });
-    
-    // Converte para o formato necessário para o gráfico
+  
     const chartData: CategoryDataItem[] = Object.keys(categories).map((category, index) => ({
       name: category,
       value: categories[category],
       fill: COLORS[index % COLORS.length]
     }));
     
-    // Ordena por valor (maior para menor)
     chartData.sort((a, b) => b.value - a.value);
     
     setCategoryData(chartData);
     
-    // Calcula tendência (apenas se estivermos mostrando dados de um mês)
     if (!showAllMonths) {
       const randomTrend = parseFloat((Math.random() * 10 - 5).toFixed(1));
       setTrend({
@@ -104,7 +92,6 @@ export default function CategoryCharts({ data, allMonthsData }: CategoryChartsPr
     }
   }, [data, allMonthsData, showAllMonths]);
 
-  // Configuração para o ChartContainer
   const chartConfig: ChartConfig = categoryData.reduce((config, item) => {
     config[item.name] = {
       label: item.name,

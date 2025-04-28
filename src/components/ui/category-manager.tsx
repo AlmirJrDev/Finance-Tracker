@@ -49,7 +49,6 @@ export default function CategoryManager({ isOpen, onClose }: CategoryManagerProp
   const handleDeleteCategory = (index: number) => {
     const categoryToDelete = categories[index];
     
-    // Não permitir excluir categorias padrão
     if (DEFAULT_CATEGORIES.includes(categoryToDelete)) {
       alert('Não é possível excluir categorias padrão do sistema.');
       return;

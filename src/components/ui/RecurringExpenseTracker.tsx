@@ -17,28 +17,14 @@ type RecurringExpenseTrackerProps = {
 };
 
 export default function RecurringExpenseTracker({ data, onUpdateProjections }: RecurringExpenseTrackerProps) {
-  // Estimativa mensal de gastos recorrentes não fixos
-  const [monthlyEstimate, setMonthlyEstimate] = useState<number>(0);
-  
-  // Valor por dia
+  const [monthlyEstimate, setMonthlyEstimate] = useState<number>(0)
   const [dailyAmount, setDailyAmount] = useState<number>(0);
-  
-  // Dias em que o usuário não gastou o valor previsto (economizou)
   const [savedDays, setSavedDays] = useState<number[]>([]);
-  
-  // Status de ativação do recurso
   const [isEnabled, setIsEnabled] = useState<boolean>(false);
-  
-  // Para visualização da projeção nos próximos dias
   const [showProjection, setShowProjection] = useState<boolean>(false);
-  
-  // Número de dias no mês selecionado
   const daysInMonth = new Date(data.year, data.month + 1, 0).getDate();
-  
-  // Dia atual do mês
   const currentDay = new Date().getDate();
-  
-  // Carregar dados salvos do localStorage
+
   useEffect(() => {
     try {
       const savedEstimate = localStorage.getItem(`recurring-estimate-${data.month}-${data.year}`);
@@ -52,8 +38,7 @@ export default function RecurringExpenseTracker({ data, onUpdateProjections }: R
       console.error('Erro ao carregar dados de gastos recorrentes:', error);
     }
   }, [data.month, data.year]);
-  
-  // Salvar dados no localStorage quando mudam
+
   useEffect(() => {
     try {
       localStorage.setItem(`recurring-estimate-${data.month}-${data.year}`, monthlyEstimate.toString());
@@ -64,23 +49,18 @@ export default function RecurringExpenseTracker({ data, onUpdateProjections }: R
     }
   }, [monthlyEstimate, savedDays, isEnabled, data.month, data.year]);
   
-  // Calcular o valor diário sempre que a estimativa ou o número de dias mudar
   useEffect(() => {
     if (monthlyEstimate > 0 && daysInMonth > 0) {
       const perDay = monthlyEstimate / daysInMonth;
       setDailyAmount(perDay);
       
-      // Se tiver callback para atualização das projeções
       if (onUpdateProjections && isEnabled) {
         const projections = [];
         for (let day = 1; day <= daysInMonth; day++) {
-          // Não projeta para dias que já passaram e foram marcados como "economizados"
           if (day < currentDay && savedDays.includes(day)) continue;
-          
-          // Não projeta para dias passados não marcados (assume que o gasto ocorreu)
+
           if (day < currentDay && !savedDays.includes(day)) continue;
           
-          // Projeta para o dia atual e dias futuros
           if (day >= currentDay) {
             projections.push({
               date: new Date(data.year, data.month, day),
@@ -92,16 +72,14 @@ export default function RecurringExpenseTracker({ data, onUpdateProjections }: R
       }
     }
   }, [monthlyEstimate, daysInMonth, savedDays, isEnabled, currentDay, onUpdateProjections, data.year, data.month]);
-  
-  // Formatar valores monetários
+
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
       currency: 'BRL'
     }).format(value);
   };
-  
-  // Marcar um dia como "economizado" (não gastou o valor previsto)
+
   const toggleSavedDay = (day: number) => {
     if (savedDays.includes(day)) {
       setSavedDays(savedDays.filter(d => d !== day));
@@ -109,20 +87,14 @@ export default function RecurringExpenseTracker({ data, onUpdateProjections }: R
       setSavedDays([...savedDays, day]);
     }
   };
-  
-  // Total economizado por não gastar em certos dias
   const savedAmount = savedDays.length * dailyAmount;
-  
-  // Dias passados no mês (incluindo hoje)
+
   const passedDays = Math.min(currentDay, daysInMonth);
   
-  // Dias restantes no mês (excluindo hoje)
   const remainingDays = daysInMonth - passedDays;
-  
-  // Total gasto até agora (dias passados - dias economizados) * valor diário
+
   const spentAmount = (passedDays - savedDays.filter(d => d <= currentDay).length) * dailyAmount;
-  
-  // Total projetado para gastar nos dias restantes
+
   const projectedRemainingAmount = remainingDays * dailyAmount;
   
   return (

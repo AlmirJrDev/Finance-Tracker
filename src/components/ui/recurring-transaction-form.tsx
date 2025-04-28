@@ -104,7 +104,6 @@ export default function RecurringTransactionForm({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
       
-    // Validação básica
     if (!transaction.description || !transaction.amount || transaction.amount <= 0) {
       alert('Por favor, preencha a descrição e um valor válido.');
       return;
@@ -120,7 +119,6 @@ export default function RecurringTransactionForm({
       return;
     }
       
-    // Formata a transação final
     const finalTransaction: RecurringTransaction = {
       id: transaction.id || `rec-trans-${Date.now()}`,
       description: transaction.description || '',
@@ -170,13 +168,11 @@ export default function RecurringTransactionForm({
     'Sábado',
   ];
 
-  // No useEffect inicial, adicione:
 useEffect(() => {
   const loadedCategories = loadCategories();
   setCategories(loadedCategories);
 }, []);
 
-// Adicione esta função para adicionar categorias personalizadas
 const handleAddCategory = () => {
   if (newCategory.trim()) {
     const updatedCategories = addCategory(newCategory.trim());

@@ -15,7 +15,7 @@ export function loadData(): MonthlyData[] {
       // Converte as string de datas de volta para objetos Date
       const parsedData = data.map((month: any) => ({
         ...month,
-        initialBalance: month.initialBalance || 0, // Garante que initialBalance exista
+        initialBalance: month.initialBalance || 0,
         dailyBalances: month.dailyBalances.map((day: any) => ({
           ...day,
           date: new Date(day.date),

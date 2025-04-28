@@ -15,10 +15,8 @@ export function MonthSelector({
   currentYear, 
   onMonthChange 
 }: MonthSelectorProps) {
-  // Criar uma lista de todos os meses para 2025 e 2026
   const allMonths: { month: number, year: number, label: string, value: string }[] = [];
   
-  // Adicionar todos os meses de 2025
   for (let month = 0; month < 12; month++) {
     allMonths.push({
       month,
@@ -28,7 +26,6 @@ export function MonthSelector({
     });
   }
   
-  // Adicionar todos os meses de 2026
   for (let month = 0; month < 12; month++) {
     allMonths.push({
       month,
@@ -39,8 +36,7 @@ export function MonthSelector({
   }
 
   return (
-    <Card className="w-full mb-4">
-      <CardContent className="pt-4">
+
         <Select 
           value={`${currentYear}-${currentMonth}`}
           onValueChange={(value) => {
@@ -59,7 +55,6 @@ export function MonthSelector({
             ))}
           </SelectContent>
         </Select>
-      </CardContent>
-    </Card>
+ 
   );
 }

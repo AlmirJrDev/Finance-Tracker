@@ -22,28 +22,26 @@ import DailyAllowance from '@/components/ui/daily-allowance';
 import CategoryCharts from '@/components/ui/categoria-chart';
 import { ModeToggle } from '@/components/ui/themeSwitcher';
 import RecurringExpenseTracker from '@/components/ui/RecurringExpenseTracker';
-import { Card } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { TutorialGuide } from '@/components/ui/tutorialGuide';
+import CategoryBudgetManager from '@/components/ui/CategoryBudgetManager';
 
 
 export default function HomePage() {
-  // Iniciar com array vazio ao invés de INITIAL_DATA
   const [allMonthsData, setAllMonthsData] = useState<MonthlyData[]>([]);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const [showRecurring, setShowRecurring] = useState(false);
   const [showCategoryManager, setShowCategoryManager] = useState(false);
   
-  // Carrega dados do localStorage quando o componente é montado
   useEffect(() => {
     const storedData = loadData();
     if (storedData && storedData.length > 0) {
       setAllMonthsData(storedData);
     }
-    // Removida a parte que usava INITIAL_DATA
+    
   }, []);
   
-  // Usar o mês atual como padrão
   const currentMonth = new Date().getMonth();
   const currentYear = new Date().getFullYear();
   
@@ -95,11 +93,11 @@ export default function HomePage() {
   };
 
   // const clearAppData = () => {
-  //   // Remove apenas os dados do seu aplicativo
-  //   localStorage.removeItem('financialData'); // Ajuste para a chave que você usa
+  //   
+  //   localStorage.removeItem('financialData'); 
   //   alert('Dados do aplicativo removidos com sucesso!');
     
-  //   // Se quiser atualizar o estado da aplicação também
+  //   
   //   setAllMonthsData([]);
   // };
 
@@ -108,9 +106,21 @@ export default function HomePage() {
      <div className="flex justify-between items-center mb-6">
   <h1 className="text-3xl font-bold">Controle Financeiro 2025</h1>
   <div className="flex gap-2">
+  <ModeToggle/>
   <TutorialGuide />
-    <ModeToggle/>
-    <Button 
+
+ 
+  </div>
+</div>
+<Card className="w-full  flex justify-center mb-4">
+<CardContent className=" flex justify-between items-center "><MonthSelector 
+        currentMonth={selectedMonth}
+        currentYear={selectedYear}
+        onMonthChange={handleMonthChange}
+      />
+
+      <div className='flex gap-2'>
+         <Button 
       variant="outline" 
       onClick={() => setShowCategoryManager(true)}
     >
@@ -126,14 +136,10 @@ export default function HomePage() {
       <Plus className="h-4 w-4" />
       Nova Transação
     </Button>
-  </div>
-</div>
-      
-<MonthSelector 
-        currentMonth={selectedMonth}
-        currentYear={selectedYear}
-        onMonthChange={handleMonthChange}
-      />
+    </div>
+      </CardContent>
+</Card>
+
       
       {showRecurring ? (
   <RecurringTransactions 
@@ -145,6 +151,7 @@ export default function HomePage() {
   <>
     <MonthlySummary data={monthlyData} allMonthsData={allMonthsData} />
     <CategoryCharts data={monthlyData} allMonthsData={allMonthsData} />
+    <CategoryBudgetManager data={monthlyData} allMonthsData={allMonthsData} />
     <DailyAllowance data={monthlyData} />
     <RecurringExpenseTracker data={monthlyData} />
     <TransactionsTable 

@@ -7,7 +7,6 @@ interface MonthlySummaryProps {
   allMonthsData?: MonthlyData[];
 }
 
-// Função auxiliar para formatar valores monetários
 function formatCurrency(value: number): string {
   return new Intl.NumberFormat('pt-BR', {
     style: 'currency',
@@ -15,13 +14,12 @@ function formatCurrency(value: number): string {
   }).format(value);
 }
 
-// Função para encontrar o mês anterior
 function findPreviousMonth(data: MonthlyData[], month: number, year: number): MonthlyData | undefined {
   let prevMonth = month - 1;
   let prevYear = year;
   
   if (prevMonth < 0) {
-    prevMonth = 11; // Dezembro
+    prevMonth = 11; 
     prevYear -= 1;
   }
   
@@ -29,11 +27,9 @@ function findPreviousMonth(data: MonthlyData[], month: number, year: number): Mo
 }
 
 export function MonthlySummary({ data, allMonthsData = [] }: MonthlySummaryProps) {
-  // Encontrar o mês anterior (se existir)
   
   const previousMonth = findPreviousMonth(allMonthsData, data.month, data.year);
-  
-  // Calcular o saldo final (balanço atual = saldo inicial + performance)
+
   const currentBalance = (data.initialBalance || 0) + data.performance;
   
   return (

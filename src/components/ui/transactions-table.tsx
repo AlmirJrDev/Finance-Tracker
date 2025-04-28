@@ -53,18 +53,14 @@ export function TransactionsTable({
     }
   };
 
-  // Ensure all dates are proper Date objects
   const processedBalances = dailyBalances.map(day => ({
     ...day,
     date: day.date instanceof Date ? day.date : new Date(day.date)
   }));
 
-  // Filtra apenas dias com transações
   const daysWithTransactions = processedBalances.filter(
     day => day.dailyTransactions.length > 0 || day.income > 0 || day.expense > 0
   );
-  
-  // Ordena por data (mais recente primeiro)
   daysWithTransactions.sort((a, b) => b.date.getTime() - a.date.getTime());
 
   return (
@@ -86,7 +82,6 @@ export function TransactionsTable({
           <TableBody>
           {daysWithTransactions.length > 0 ? (
             daysWithTransactions.map((day, dayIndex) => {
-              // Create a unique date identifier for this day
               const dateKey = `day-${dayIndex}-${day.date.toISOString().split('T')[0]}`;
               
               return (
@@ -121,7 +116,6 @@ export function TransactionsTable({
                               </TableHeader>
                               <TableBody>
                                 {day.dailyTransactions.map((transaction, transIndex) => {
-                                  // Generate a completely unique key for each transaction
                                   const transactionKey = `trans-${dayIndex}-${transIndex}-${transaction.id}`;
                                   
                                   return (

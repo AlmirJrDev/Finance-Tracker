@@ -13,30 +13,24 @@ type DailyAllowanceProps = {
 };
 
 export default function DailyAllowance({ data }: DailyAllowanceProps) {
-  // Usar o valor de performance como base
+
   const performanceValue = data.performance || 0;
   
-  // Valor que a pessoa quer disponibilizar para gastos discricionários
-  // Inicialmente 100% do performance
   const [allowanceAmount, setAllowanceAmount] = useState<number>(performanceValue);
   
-  // Valor do item que a pessoa deseja comprar
   const [targetItemValue, setTargetItemValue] = useState<number>(0);
   const [targetItemName, setTargetItemName] = useState<string>('');
   
-  // Dados calculados
   const [dailyAllowance, setDailyAllowance] = useState<number>(0);
   const [daysToSave, setDaysToSave] = useState<number>(0);
   
-  // Número de dias no mês selecionado
   const daysInMonth = new Date(data.year, data.month + 1, 0).getDate();
   
-  // Atualizar o valor quando performance mudar
+
   useEffect(() => {
     setAllowanceAmount(performanceValue);
   }, [performanceValue]);
   
-  // Calcular a mesada diária sempre que os valores principais mudarem
   useEffect(() => {
     if (allowanceAmount > 0 && daysInMonth > 0) {
       const dailyValue = allowanceAmount / daysInMonth;
@@ -48,7 +42,6 @@ export default function DailyAllowance({ data }: DailyAllowanceProps) {
     }
   }, [allowanceAmount, daysInMonth, targetItemValue]);
   
-  // Formatar valores monetários
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
@@ -56,7 +49,6 @@ export default function DailyAllowance({ data }: DailyAllowanceProps) {
     }).format(value);
   };
   
-  // Calcular a data futura com base no número de dias
   const getFutureDate = (days: number) => {
     const currentDate = new Date(data.year, data.month, new Date().getDate());
     const futureDate = new Date(currentDate);
@@ -65,7 +57,6 @@ export default function DailyAllowance({ data }: DailyAllowanceProps) {
     return futureDate.toLocaleDateString('pt-BR');
   };
   
-  // Calcular a porcentagem do valor de performance
   const allowancePercentage = performanceValue > 0 
     ? Math.round((allowanceAmount / performanceValue) * 100)
     : 0;
@@ -84,7 +75,6 @@ export default function DailyAllowance({ data }: DailyAllowanceProps) {
       </CardHeader>
       <CardContent>
 
-          {/* Coluna 1: Definição do valor disponível */}
           <div className="space-y-4">
             <div className="space-y-2">
               <Label>Quanto da sua performance você quer disponibilizar para gastos livres?</Label>
