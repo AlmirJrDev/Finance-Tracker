@@ -33,6 +33,7 @@ import { Plus, Calendar, Edit, MoreVertical, Trash2, PlusCircle, CalendarRange }
 import { Transaction } from '@/types/finance';
 import { addCategory, loadCategories } from '@/lib/categories';
 import { toast } from 'sonner';
+import { playNotificationSound } from '@/lib/notification';
 
 export type RecurringTransaction = {
   id: string;
@@ -164,6 +165,7 @@ export default function RecurringTransactions({
     }
     
     resetForm();
+    playNotificationSound();
     toast.success("Transação adicionada", {
       description: `${transaction.description} foi adicionada com sucesso.`
     });
@@ -205,6 +207,7 @@ export default function RecurringTransactions({
   const handleApplyTransactions = () => {
     if (pendingTransactions.length > 0) {
       onAddTransactions(pendingTransactions);
+      playNotificationSound();
       toast.success(`${pendingTransactions.length} transações aplicadas ao mês atual.`);
     } else {
       toast.error('Não há transações pendentes para aplicar.');
@@ -260,7 +263,7 @@ export default function RecurringTransactions({
       const months = new Set(futurePendingTransactions.map(t => 
         `${t.date.getMonth()}-${t.date.getFullYear()}`
       )).size;
-      
+      playNotificationSound();
       toast.success(`Transações recorrentes aplicadas com sucesso!`, {
         description: `${futurePendingTransactions.length} transações foram aplicadas em ${months} meses.`
       });

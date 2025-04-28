@@ -24,6 +24,7 @@ import { Transaction } from '@/types/finance';
 import { loadCategories, addCategory } from '@/lib/categories';
 import { PlusCircle } from 'lucide-react';
 import { toast } from 'sonner'; 
+import { playNotificationSound } from '@/lib/notification';
 
 type TransactionFormProps = {
   isOpen: boolean;
@@ -132,6 +133,7 @@ export default function TransactionForm({
     };
       
     onSave(finalTransaction);
+    playNotificationSound();
     toast.success(isEditing ? "Transação atualizada" : "Transação adicionada", {
       description: `${transaction.description} foi ${isEditing ? 'atualizada' : 'adicionada'} com sucesso.`
     });

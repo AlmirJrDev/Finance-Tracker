@@ -102,7 +102,7 @@ export default function HomePage() {
   // };
 
   return (
-    <div className="container mx-auto py-4  lg:py-8 lg:px-32">
+    <div className="container mx-auto py-4 px-12  lg:py-8 lg:px-32">
      <div className="flex justify-between items-center mb-6">
   <h1 className="text-3xl font-bold">Controle Financeiro 2025</h1>
   <div className="flex gap-2">
@@ -177,7 +177,7 @@ export default function HomePage() {
         <Card className="text-center p-8 rounded-md flex justify-center items-center">
           <h3 className="text-lg font-medium">Nenhum dado disponível para {MONTHS[selectedMonth]} de {selectedYear}</h3>
           <p className="text-gray-500 mb-4">Adicione sua primeira transação para este período.</p>
-          <Button onClick={handleAddTransaction} className='w-96'>Adicionar Transação</Button>
+          <Button onClick={handleAddTransaction} className='w-full md:w-96'>Adicionar Transação</Button>
         </Card>
       )}
 
