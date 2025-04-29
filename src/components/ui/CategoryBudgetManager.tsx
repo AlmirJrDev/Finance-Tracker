@@ -8,7 +8,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Progress } from '@/components/ui/progress';
 import { AlertCircle, Edit, Trash2, PlusCircle } from 'lucide-react';
 import { loadCategories } from '@/lib/categories';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { MonthlyData } from '@/types/finance';
 
 interface CategoryBudget {
@@ -161,7 +160,7 @@ export default function CategoryBudgetManager({ data }: CategoryBudgetManagerPro
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="flex gap-2 mb-6">
+        <div className="flex flex-col gap-2 mb-6 md:flex-row">
           <select 
             className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
             value={selectedCategory}
@@ -179,7 +178,7 @@ export default function CategoryBudgetManager({ data }: CategoryBudgetManagerPro
             placeholder="Valor limite"
             value={budgetLimit}
             onChange={(e) => setBudgetLimit(e.target.value)}
-            className="w-36"
+            className="w-full"
             min="0"
             step="0.01"
           />
@@ -193,7 +192,7 @@ export default function CategoryBudgetManager({ data }: CategoryBudgetManagerPro
           )}
         </div>
 
-        <ScrollArea className="max-h-80 overflow-auto pr-3">
+  
           {budgetLimits.length > 0 ? (
             <Table>
               <TableHeader>
@@ -259,7 +258,7 @@ export default function CategoryBudgetManager({ data }: CategoryBudgetManagerPro
               Nenhum limite orçamentário definido. Adicione seu primeiro limite acima.
             </div>
           )}
-        </ScrollArea>
+   
       </CardContent>
     </Card>
   );

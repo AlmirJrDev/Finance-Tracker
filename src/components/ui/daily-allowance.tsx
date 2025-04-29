@@ -62,7 +62,7 @@ export default function DailyAllowance({ data }: DailyAllowanceProps) {
     : 0;
   
   return (
-    <div className='flex gap-4'>
+    <div className='flex gap-4 flex-col md:flex-row'>
  <Card className="mb-6 flex-1">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
