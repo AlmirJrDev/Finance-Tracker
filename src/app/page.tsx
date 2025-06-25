@@ -25,6 +25,10 @@ import { Card, CardContent } from '@/components/ui/card';
 import { TutorialGuide } from '@/components/ui/tutorialGuide';
 import CategoryBudgetManager from '@/components/ui/CategoryBudgetManager';
 import { KeyboardEasterEgg } from '@/components/konami';
+import { GoogleDriveSync } from '@/components/googleDriveSync';
+
+
+
 
 
 export default function HomePage() {
@@ -103,6 +107,7 @@ export default function HomePage() {
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold">Controle Financeiro 2025</h1>
         <div className="flex gap-2">
+        <GoogleDriveSync />
           <ModeToggle/>
           <TutorialGuide />
         </div>
