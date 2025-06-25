@@ -10,7 +10,6 @@ import { MonthlyData, Transaction } from '@/types/finance';
 import { Plus } from 'lucide-react';
 import { 
   loadData, 
-
   addTransaction, 
   removeTransaction,
   applyRecurringTransactions 
@@ -25,6 +24,7 @@ import RecurringExpenseTracker from '@/components/ui/RecurringExpenseTracker';
 import { Card, CardContent } from '@/components/ui/card';
 import { TutorialGuide } from '@/components/ui/tutorialGuide';
 import CategoryBudgetManager from '@/components/ui/CategoryBudgetManager';
+import { KeyboardEasterEgg } from '@/components/konami';
 
 
 export default function HomePage() {
@@ -92,88 +92,80 @@ export default function HomePage() {
     setAllMonthsData(updatedData);
   };
 
-  // const clearAppData = () => {
-  //   
-  //   localStorage.removeItem('financialData'); 
-  //   alert('Dados do aplicativo removidos com sucesso!');
-    
-  //   
-  //   setAllMonthsData([]);
-  // };
+  const clearAppData = () => {
+    localStorage.removeItem('financialData'); 
+    alert('Dados do aplicativo removidos com sucesso!');
+    setAllMonthsData([]);
+  };
 
   return (
     <div className="container mx-auto py-4 px-12  lg:py-8 lg:px-32">
-     <div className="flex justify-between items-center mb-6">
-  <h1 className="text-3xl font-bold">Controle Financeiro 2025</h1>
-  <div className="flex gap-2">
-  <ModeToggle/>
-  <TutorialGuide />
-
- 
-  </div>
-</div>
-<Card className="w-full mb-4">
-  <CardContent className="p-4">
-    <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
-
-      <div className="flex justify-center md:justify-start">
-        <MonthSelector 
-          currentMonth={selectedMonth}
-          currentYear={selectedYear}
-          onMonthChange={handleMonthChange}
-        />
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-3xl font-bold">Controle Financeiro 2025</h1>
+        <div className="flex gap-2">
+          <ModeToggle/>
+          <TutorialGuide />
+        </div>
       </div>
-      
-   
-      <div className="flex flex-col sm:flex-row gap-2">
-        <Button 
-          variant="outline" 
-          onClick={() => setShowCategoryManager(true)}
-          className="text-sm"
-        >
-          Gerenciar Categorias
-        </Button>
-        <Button 
-          variant="outline" 
-          onClick={() => setShowRecurring(!showRecurring)}
-          className="text-sm"
-        >
-          {showRecurring ? 'Voltar ao Resumo' : 'Transações Recorrentes'}
-        </Button>
-        <Button 
-          onClick={handleAddTransaction} 
-          className="flex items-center justify-center gap-1 text-sm"
-        >
-          <Plus className="h-4 w-4" />
-          <span className="sm:inline">Nova Transação</span>
-        </Button>
-      </div>
-    </div>
-  </CardContent>
-</Card>
 
+      <Card className="w-full mb-4">
+        <CardContent className="p-4">
+          <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
+            <div className="flex justify-center md:justify-start">
+              <MonthSelector 
+                currentMonth={selectedMonth}
+                currentYear={selectedYear}
+                onMonthChange={handleMonthChange}
+              />
+            </div>
+            
+            <div className="flex flex-col sm:flex-row gap-2">
+              <Button 
+                variant="outline" 
+                onClick={() => setShowCategoryManager(true)}
+                className="text-sm"
+              >
+                Gerenciar Categorias
+              </Button>
+              <Button 
+                variant="outline" 
+                onClick={() => setShowRecurring(!showRecurring)}
+                className="text-sm"
+              >
+                {showRecurring ? 'Voltar ao Resumo' : 'Transações Recorrentes'}
+              </Button>
+              <Button 
+                onClick={handleAddTransaction} 
+                className="flex items-center justify-center gap-1 text-sm"
+              >
+                <Plus className="h-4 w-4" />
+                <span className="sm:inline">Nova Transação</span>
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
       
       {showRecurring ? (
-  <RecurringTransactions 
-    onAddTransactions={handleApplyRecurringTransactions}
-    selectedMonth={selectedMonth}
-    selectedYear={selectedYear}
-  />
-) : monthlyData ? (
-  <>
-    <MonthlySummary data={monthlyData} allMonthsData={allMonthsData} />
-    <CategoryCharts data={monthlyData} allMonthsData={allMonthsData} />
-    <CategoryBudgetManager data={monthlyData} allMonthsData={allMonthsData} />
-    <DailyAllowance data={monthlyData} />
-    <RecurringExpenseTracker data={monthlyData} />
-    <TransactionsTable 
-      dailyBalances={monthlyData.dailyBalances} 
-      onEditTransaction={handleEditTransaction}
-      onDeleteTransaction={handleDeleteTransaction}
-    />
-  </>
-) : (
-  
+        <RecurringTransactions 
+          onAddTransactions={handleApplyRecurringTransactions}
+          selectedMonth={selectedMonth}
+          selectedYear={selectedYear}
+        />
+      ) : monthlyData ? (
+        <>
+          <MonthlySummary data={monthlyData} allMonthsData={allMonthsData} />
+          <CategoryCharts data={monthlyData} allMonthsData={allMonthsData} />
+          <CategoryBudgetManager data={monthlyData} allMonthsData={allMonthsData} />
+          <DailyAllowance data={monthlyData} />
+          <RecurringExpenseTracker data={monthlyData} />
+          <TransactionsTable 
+            dailyBalances={monthlyData.dailyBalances} 
+            onEditTransaction={handleEditTransaction}
+            onDeleteTransaction={handleDeleteTransaction}
+          />
+        </>
+      ) : (
         <Card className="text-center p-8 rounded-md flex justify-center items-center">
           <h3 className="text-lg font-medium">Nenhum dado disponível para {MONTHS[selectedMonth]} de {selectedYear}</h3>
           <p className="text-gray-500 mb-4">Adicione sua primeira transação para este período.</p>
@@ -191,11 +183,14 @@ export default function HomePage() {
         editTransaction={editingTransaction}
         currentDate={new Date(selectedYear, selectedMonth, new Date().getDate())}
       />
-      {/* <LocalStorageViewer/> <Button onClick={clearAppData} variant="destructive">Limpar Dados do App</Button> */}
+
+      {/* Easter egg component - hidden until activated with keyboard sequence */}
+      <KeyboardEasterEgg clearAppData={clearAppData} />
+
       <CategoryManager 
-  isOpen={showCategoryManager}
-  onClose={() => setShowCategoryManager(false)}
-/>
+        isOpen={showCategoryManager}
+        onClose={() => setShowCategoryManager(false)}
+      />
     </div>
   );
 }
