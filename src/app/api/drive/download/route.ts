@@ -1,7 +1,8 @@
 // app/api/drive/download/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
-import { authOptions } from '../../auth/[...nextauth]/route'
+import { authOptions } from '@/lib/auth'
+
 
 export async function GET(request: NextRequest) {
   try {
@@ -72,6 +73,7 @@ export async function GET(request: NextRequest) {
         data: data 
       })
     } catch (parseError) {
+      console.error('JSON parse error:', parseError)
       return NextResponse.json({ 
         success: false, 
         message: 'Invalid JSON file' 

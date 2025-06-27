@@ -1,7 +1,23 @@
-import { AuthOptions } from "next-auth";
-import GoogleProvider from 'next-auth/providers/google';
+import NextAuth from 'next-auth'
+import GoogleProvider from 'next-auth/providers/google'
+import { NextAuthOptions } from 'next-auth'
 
-export const authOptions: AuthOptions = {
+// Extend the built-in session types
+declare module "next-auth" {
+  interface Session {
+    accessToken?: string
+    refreshToken?: string
+  }
+}
+
+declare module "next-auth/jwt" {
+  interface JWT {
+    accessToken?: string
+    refreshToken?: string
+  }
+}
+
+export const authOptions: NextAuthOptions = {
   providers: [
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID!,
@@ -22,10 +38,13 @@ export const authOptions: AuthOptions = {
       return token
     },
     async session({ session, token }) {
-      // Now TypeScript knows about these properties
       session.accessToken = token.accessToken
       session.refreshToken = token.refreshToken
       return session
     }
   }
 }
+
+const handler = NextAuth(authOptions)
+
+export { handler as GET, handler as POST }

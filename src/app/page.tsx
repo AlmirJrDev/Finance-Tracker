@@ -24,7 +24,7 @@ import RecurringExpenseTracker from '@/components/ui/RecurringExpenseTracker';
 import { Card, CardContent } from '@/components/ui/card';
 import { TutorialGuide } from '@/components/ui/tutorialGuide';
 import CategoryBudgetManager from '@/components/ui/CategoryBudgetManager';
-import { KeyboardEasterEgg } from '@/components/konami';
+
 import { GoogleDriveSync } from '@/components/googleDriveSync';
 
 
@@ -96,11 +96,7 @@ export default function HomePage() {
     setAllMonthsData(updatedData);
   };
 
-  const clearAppData = () => {
-    localStorage.removeItem('financialData'); 
-    alert('Dados do aplicativo removidos com sucesso!');
-    setAllMonthsData([]);
-  };
+
 
   return (
     <div className="container mx-auto py-4 px-12  lg:py-8 lg:px-32">
@@ -190,7 +186,6 @@ export default function HomePage() {
       />
 
       {/* Easter egg component - hidden until activated with keyboard sequence */}
-      <KeyboardEasterEgg clearAppData={clearAppData} />
 
       <CategoryManager 
         isOpen={showCategoryManager}
