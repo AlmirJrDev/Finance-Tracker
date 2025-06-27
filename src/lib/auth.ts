@@ -42,7 +42,10 @@ export const authOptions: NextAuthOptions = {
       session.refreshToken = token.refreshToken
       return session
     }
-  }
+    
+  },
+  secret: process.env.AUTH_SECRET,
+
 }
 
 const handler = NextAuth(authOptions)
