@@ -26,6 +26,9 @@ import { TutorialGuide } from '@/components/ui/tutorialGuide';
 import CategoryBudgetManager from '@/components/ui/CategoryBudgetManager';
 
 import { GoogleDriveSync } from '@/components/googleDriveSync';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { UserAvatarPopover } from '@/components/ui/user';
 
 
 
@@ -103,7 +106,7 @@ export default function HomePage() {
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold">Controle Financeiro 2025</h1>
         <div className="flex gap-2">
-        <GoogleDriveSync />
+          <UserAvatarPopover />
           <ModeToggle/>
           <TutorialGuide />
         </div>

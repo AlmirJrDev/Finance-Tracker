@@ -6,7 +6,28 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
-import { Cloud, Download, Upload, User, LogOut, CheckCircle, AlertCircle, List } from 'lucide-react'
+import { 
+  Cloud, 
+  Download, 
+  Upload, 
+  User, 
+  LogOut, 
+  CheckCircle, 
+  AlertCircle, 
+  List,
+  Settings,
+  Trash2,
+  RefreshCw,
+  Clock,
+  HardDrive,
+  Shield,
+  Zap,
+  Info,
+  Eye,
+  EyeOff,
+  ChevronDown,
+  ChevronUp
+} from 'lucide-react'
 import { useGoogleDriveSync } from '@/service/useGoogleDriveSync'
 
 export function GoogleDriveSync() {
@@ -24,25 +45,39 @@ export function GoogleDriveSync() {
   const [lastBackup, setLastBackup] = useState<string | null>(null)
   const [backupStatus, setBackupStatus] = useState<'idle' | 'success' | 'error'>('idle')
   const [availableBackups, setAvailableBackups] = useState<Array<{id: string, name: string, modifiedTime: string}>>([])
-  const [isMounted, setIsMounted] = useState(false) // Track if component is mounted
+  const [isMounted, setIsMounted] = useState(false)
+  const [showAdvanced, setShowAdvanced] = useState(false)
+  const [showBackupDetails, setShowBackupDetails] = useState(false)
+  const [autoBackupEnabled, setAutoBackupEnabled] = useState(true)
+  const [notification, setNotification] = useState<{type: 'success' | 'error' | 'info', message: string} | null>(null)
   
   // Refs para controlar chamadas e intervalos
   const autoBackupIntervalRef = useRef<NodeJS.Timeout | null>(null)
   const isLoadingBackupsRef = useRef(false)
   const lastBackupLoadTimeRef = useRef<number>(0)
 
-  // ✅ CONSTANTES - movidas para fora dos useEffects
+  // Constantes
   const STORAGE_KEY = 'finance-tracker-data'
   const BACKUP_FILENAME = 'finance-tracker-backup.json'
   const AUTO_BACKUP_INTERVAL = 5 * 60 * 1000 // 5 minutos
   const BACKUP_LIST_CACHE_TIME = 30 * 1000 // 30 segundos
 
-  // ✅ Track mount state
+  // Track mount state
   useEffect(() => {
     setIsMounted(true)
+    const savedAutoBackup = localStorage.getItem('autoBackupEnabled')
+    if (savedAutoBackup !== null) {
+      setAutoBackupEnabled(JSON.parse(savedAutoBackup))
+    }
   }, [])
 
-  // ✅ Safe localStorage access helper
+  // Helper para mostrar notificações
+  const showNotification = useCallback((type: 'success' | 'error' | 'info', message: string) => {
+    setNotification({ type, message })
+    setTimeout(() => setNotification(null), 5000)
+  }, [])
+
+  // Safe localStorage access helper
   const getLocalStorageItem = useCallback((key: string): string | null => {
     if (typeof window === 'undefined') return null
     try {
@@ -62,42 +97,40 @@ export function GoogleDriveSync() {
     }
   }, [])
 
-  // ✅ Função otimizada para carregar backups com cache
-  const loadAvailableBackups = useCallback(async (forceRefresh = false) => {
-    // Evita chamadas simultâneas
-    if (isLoadingBackupsRef.current) {
-      console.log('🔄 Carregamento de backups já em progresso, ignorando...')
-      return
-    }
+  // Toggle auto backup
+  const toggleAutoBackup = useCallback(() => {
+    const newValue = !autoBackupEnabled
+    setAutoBackupEnabled(newValue)
+    setLocalStorageItem('autoBackupEnabled', JSON.stringify(newValue))
+    showNotification('info', `Backup automático ${newValue ? 'ativado' : 'desativado'}`)
+  }, [autoBackupEnabled, setLocalStorageItem, showNotification])
 
-    // Cache por 30 segundos (evita recarregar constantemente)
+  // Função otimizada para carregar backups com cache
+  const loadAvailableBackups = useCallback(async (forceRefresh = false) => {
+    if (isLoadingBackupsRef.current) return
+
     const now = Date.now()
     if (!forceRefresh && (now - lastBackupLoadTimeRef.current) < BACKUP_LIST_CACHE_TIME) {
-      console.log('📦 Usando cache de backups...')
       return
     }
 
-    if (!session?.accessToken) {
-      console.log('❌ Sem token de acesso para carregar backups')
-      return
-    }
+    if (!session?.accessToken) return
 
     isLoadingBackupsRef.current = true
     lastBackupLoadTimeRef.current = now
 
     try {
-      console.log('🔄 Carregando lista de backups...')
       const backups = await listBackups()
       setAvailableBackups(backups)
-      console.log(`✅ ${backups.length} backups carregados`)
     } catch (error) {
-      console.error('❌ Erro ao carregar backups:', error)
+      console.error('Erro ao carregar backups:', error)
+      showNotification('error', 'Erro ao carregar lista de backups')
     } finally {
       isLoadingBackupsRef.current = false
     }
-  }, [listBackups, session?.accessToken])
+  }, [listBackups, session?.accessToken, showNotification])
 
-  // ✅ Carrega informações do último backup (apenas uma vez)
+  // Carrega informações do último backup
   useEffect(() => {
     if (!isMounted) return
     
@@ -107,70 +140,58 @@ export function GoogleDriveSync() {
     }
   }, [isMounted, getLocalStorageItem])
 
-  // ✅ Carrega backups quando usuário faz login (com controle)
+  // Carrega backups quando usuário faz login
   useEffect(() => {
     if (session?.accessToken) {
-      console.log('👤 Usuário logado, carregando backups...')
-      loadAvailableBackups(true) // Force refresh no login
+      loadAvailableBackups(true)
     } else {
-      // Limpa dados quando deslogado
       setAvailableBackups([])
       clearCache()
-      console.log('👋 Usuário deslogado, limpando dados...')
     }
   }, [session?.accessToken, loadAvailableBackups, clearCache])
 
-  // ✅ Backup automático otimizado (sem dependências que mudam constantemente)
+  // Backup automático
   useEffect(() => {
-    if (!isMounted) return
+    if (!isMounted || !autoBackupEnabled) return
 
-    // Limpa interval anterior
     if (autoBackupIntervalRef.current) {
       clearInterval(autoBackupIntervalRef.current)
       autoBackupIntervalRef.current = null
     }
 
     if (session?.accessToken) {
-      // Verifica se há dados para fazer backup
       const hasData = getLocalStorageItem(STORAGE_KEY)
       
       if (hasData) {
-        console.log('⏰ Iniciando backup automático a cada 5 minutos...')
-        
         autoBackupIntervalRef.current = setInterval(async () => {
-          console.log('🔄 Executando backup automático...')
           try {
             await autoBackup(STORAGE_KEY, BACKUP_FILENAME)
-            console.log('✅ Backup automático concluído')
+            const now = new Date().toLocaleString('pt-BR')
+            setLastBackup(now)
+            setLocalStorageItem('lastBackupTime', now)
           } catch (error) {
-            console.warn('⚠️ Backup automático falhou:', error)
+            console.warn('Backup automático falhou:', error)
           }
         }, AUTO_BACKUP_INTERVAL)
-      } else {
-        console.log('📭 Nenhum dado local encontrado para backup automático')
       }
     }
 
-    // Cleanup function
     return () => {
       if (autoBackupIntervalRef.current) {
         clearInterval(autoBackupIntervalRef.current)
         autoBackupIntervalRef.current = null
-        console.log('🧹 Backup automático cancelado')
       }
     }
-  }, [session?.accessToken, autoBackup, isMounted, getLocalStorageItem]) // Dependências mínimas
+  }, [session?.accessToken, autoBackup, isMounted, autoBackupEnabled, getLocalStorageItem, setLocalStorageItem])
 
-  // ✅ Funções de ação otimizadas
+  // Funções de ação melhoradas
   const handleBackup = useCallback(async () => {
-    // Verifica se há dados para fazer backup
     const hasData = getLocalStorageItem(STORAGE_KEY)
     if (!hasData) {
-      alert('⚠️ Nenhum dado encontrado para fazer backup')
+      showNotification('error', 'Nenhum dado encontrado para fazer backup')
       return
     }
 
-    console.log('🔄 Iniciando backup manual...')
     const success = await syncLocalStorageToGoogleDrive(STORAGE_KEY, BACKUP_FILENAME)
     
     if (success) {
@@ -179,46 +200,35 @@ export function GoogleDriveSync() {
       setBackupStatus('success')
       setLocalStorageItem('lastBackupTime', now)
       
-      // Recarrega lista de backups após backup bem-sucedido
       await loadAvailableBackups(true)
-      
-      // Mostra sucesso por 3 segundos
       setTimeout(() => setBackupStatus('idle'), 3000)
       
-      alert('✅ Backup realizado com sucesso!')
-      console.log('✅ Backup manual concluído')
+      showNotification('success', 'Backup realizado com sucesso!')
     } else {
       setBackupStatus('error')
       setTimeout(() => setBackupStatus('idle'), 3000)
-      alert(`❌ Erro no backup: ${error}`)
-      console.error('❌ Erro no backup manual:', error)
+      showNotification('error', `Erro no backup: ${error}`)
     }
-  }, [syncLocalStorageToGoogleDrive, loadAvailableBackups, error, getLocalStorageItem, setLocalStorageItem])
+  }, [syncLocalStorageToGoogleDrive, loadAvailableBackups, error, getLocalStorageItem, setLocalStorageItem, showNotification])
 
   const handleRestore = useCallback(async () => {
     const confirmed = confirm(
-      '⚠️ ATENÇÃO: Isso irá sobrescrever todos os seus dados locais com os dados do backup na nuvem.\n\n' +
-      'Certifique-se de fazer um backup dos dados atuais se necessário.\n\n' +
-      'Deseja continuar?'
+      '⚠️ ATENÇÃO: Isso irá sobrescrever todos os seus dados locais.\n\nDeseja continuar?'
     )
     
     if (!confirmed) return
 
-    console.log('🔄 Iniciando restauração...')
     const success = await restoreFromGoogleDrive(BACKUP_FILENAME, STORAGE_KEY)
     
     if (success) {
-      alert('✅ Dados restaurados com sucesso!\n\nA página será recarregada para aplicar as mudanças.')
-      console.log('✅ Restauração concluída, recarregando página...')
-      // Recarrega a página para aplicar os dados restaurados
-      window.location.reload()
+      showNotification('success', 'Dados restaurados! Recarregando página...')
+      setTimeout(() => window.location.reload(), 2000)
     } else {
-      alert(`❌ Erro na restauração: ${error}`)
-      console.error('❌ Erro na restauração:', error)
+      showNotification('error', `Erro na restauração: ${error}`)
     }
-  }, [restoreFromGoogleDrive, error])
+  }, [restoreFromGoogleDrive, error, showNotification])
 
-  // ✅ Funções auxiliares memoizadas com verificação de mounting
+  // Funções auxiliares memoizadas
   const getDataSize = useMemo(() => {
     if (!isMounted) return '0 KB'
     
@@ -240,39 +250,32 @@ export function GoogleDriveSync() {
 
   const formatDate = useCallback((dateString: string) => {
     try {
-      return new Date(dateString).toLocaleString('pt-BR')
+      const date = new Date(dateString)
+      const now = new Date()
+      const diffHours = (now.getTime() - date.getTime()) / (1000 * 60 * 60)
+      
+      if (diffHours < 1) return 'Há poucos minutos'
+      if (diffHours < 24) return `Há ${Math.floor(diffHours)} horas`
+      if (diffHours < 48) return 'Ontem'
+      return date.toLocaleString('pt-BR')
     } catch {
       return dateString
     }
   }, [])
 
-  // ✅ Debug function otimizada
-  const debugInfo = useCallback(() => {
-    if (typeof window !== 'undefined') {
-      const data = getLocalStorageItem(STORAGE_KEY)
-      console.group('🔍 DEBUG INFO')
-      console.log('Chave localStorage:', STORAGE_KEY)
-      console.log('Dados encontrados:', data ? 'SIM' : 'NÃO')
-      console.log('Tamanho dos dados:', data ? data.length : 0)
-      console.log('Todas as chaves no localStorage:', Object.keys(localStorage))
-      console.log('Session status:', status)
-      console.log('Access token:', session?.accessToken ? 'PRESENTE' : 'AUSENTE')
-      console.log('Backups disponíveis:', availableBackups.length)
-      console.log('Loading state:', isLoading)
-      console.log('Error state:', error)
-      console.log('Component mounted:', isMounted)
-      console.groupEnd()
-    }
-  }, [STORAGE_KEY, status, session?.accessToken, availableBackups.length, isLoading, error, isMounted, getLocalStorageItem])
+  const getBackupStatusColor = useMemo(() => {
+    if (!hasLocalData) return 'text-gray-400'
+    if (availableBackups.length === 0) return 'text-yellow-500'
+    return 'text-green-500'
+  }, [hasLocalData, availableBackups.length])
 
-  // ✅ Debug apenas uma vez no mount
-  useEffect(() => {
-    if (isMounted) {
-      debugInfo()
-    }
-  }, [isMounted]) // Executa apenas quando o componente está montado
+  const getConnectionStatus = useMemo(() => {
+    if (!session) return { status: 'disconnected', text: 'Desconectado', color: 'text-red-500' }
+    if (isLoading) return { status: 'syncing', text: 'Sincronizando...', color: 'text-blue-500' }
+    return { status: 'connected', text: 'Conectado', color: 'text-green-500' }
+  }, [session, isLoading])
 
-  // ✅ Cleanup geral no unmount
+  // Cleanup no unmount
   useEffect(() => {
     return () => {
       if (autoBackupIntervalRef.current) {
@@ -281,203 +284,308 @@ export function GoogleDriveSync() {
     }
   }, [])
 
-  // ✅ Prevent rendering during SSR for localStorage-dependent content
-  if (!isMounted) {
+  // Loading state
+  if (!isMounted || status === 'loading') {
     return (
       <Card className="w-full">
-        <CardContent className="p-6">
-          <div className="flex justify-center items-center gap-2">
-            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500"></div>
-            <span>Carregando...</span>
+        <CardContent className="p-8">
+          <div className="flex flex-col items-center gap-4">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+            <p className="text-sm text-muted-foreground">Carregando configurações da conta...</p>
           </div>
         </CardContent>
       </Card>
     )
   }
 
-  if (status === 'loading') {
-    return (
-      <Card className="w-full">
-        <CardContent className="p-6">
-          <div className="flex justify-center items-center gap-2">
-            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500"></div>
-            <span>Carregando...</span>
-          </div>
-        </CardContent>
-      </Card>
-    )
-  }
-
+  // Not logged in
   if (!session) {
     return (
-      <Card className="w-full">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Cloud className="h-5 w-5" />
-            Backup na Nuvem
-          </CardTitle>
-          <CardDescription>
-            Faça login com Google para sincronizar seus dados financeiros na nuvem
+      <Card className="w-full border-dashed border-2">
+        <CardHeader className="text-center">
+          <div className="mx-auto w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mb-4">
+            <Cloud className="h-8 w-8 text-blue-500" />
+          </div>
+          <CardTitle className="text-xl">Backup Seguro na Nuvem</CardTitle>
+          <CardDescription className="text-base">
+            Proteja seus dados com backup automático no Google Drive
           </CardDescription>
         </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            <div className="text-sm text-muted-foreground">
-              <p>• Seus dados ficam seguros no Google Drive</p>
-              <p>• Acesse de qualquer dispositivo</p>
-              <p>• Backup automático quando logado</p>
+        <CardContent className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+            <div className="flex items-center gap-3 p-3 bg-green-50 rounded-lg">
+              <Shield className="h-5 w-5 text-green-600" />
+              <span className="text-green-700">Dados seguros</span>
             </div>
-            
-            <Button
-              onClick={() => signIn('google')}
-              disabled={isLoading}
-              className="w-full"
-            >
-              <User className="mr-2 h-4 w-4" />
-              Fazer Login com Google
-            </Button>
+            <div className="flex items-center gap-3 p-3 bg-blue-50 rounded-lg">
+              <Zap className="h-5 w-5 text-blue-600" />
+              <span className="text-blue-700">Sync automático</span>
+            </div>
+            <div className="flex items-center gap-3 p-3 bg-purple-50 rounded-lg">
+              <RefreshCw className="h-5 w-5 text-purple-600" />
+              <span className="text-purple-700">Multi-dispositivo</span>
+            </div>
           </div>
+          
+          <Button
+            onClick={() => signIn('google')}
+            disabled={isLoading}
+            size="lg"
+            className="w-full h-12 text-base"
+          >
+            <User className="mr-2 h-5 w-5" />
+            Conectar com Google
+          </Button>
+          
+          <p className="text-xs text-center text-muted-foreground">
+            Seus dados ficam privados e são acessados apenas por você
+          </p>
         </CardContent>
       </Card>
     )
   }
 
   return (
-    <Card className="w-full">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Cloud className="h-5 w-5" />
-          Backup na Nuvem
-          {backupStatus === 'success' && <CheckCircle className="h-4 w-4 text-green-500" />}
-          {backupStatus === 'error' && <AlertCircle className="h-4 w-4 text-red-500" />}
-        </CardTitle>
-        <CardDescription>
-          Logado como: <strong>{session.user?.email}</strong>
-        </CardDescription>
-      </CardHeader>
-      
-      <CardContent className="space-y-4">
-        {error && (
-          <Alert variant="destructive">
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        )}
+    <div className="space-y-4">
+      {/* Notificações */}
+      {notification && (
+        <Alert className={`border-l-4 ${
+          notification.type === 'success' ? 'border-l-green-500 bg-green-50' :
+          notification.type === 'error' ? 'border-l-red-500 bg-red-50' :
+          'border-l-blue-500 bg-blue-50'
+        }`}>
+          {notification.type === 'success' ? <CheckCircle className="h-4 w-4 text-green-600" /> :
+           notification.type === 'error' ? <AlertCircle className="h-4 w-4 text-red-600" /> :
+           <Info className="h-4 w-4 text-blue-600" />}
+          <AlertDescription className={
+            notification.type === 'success' ? 'text-green-700' :
+            notification.type === 'error' ? 'text-red-700' :
+            'text-blue-700'
+          }>
+            {notification.message}
+          </AlertDescription>
+        </Alert>
+      )}
 
-        {backupStatus === 'success' && (
-          <Alert>
-            <CheckCircle className="h-4 w-4" />
-            <AlertDescription>Backup realizado com sucesso!</AlertDescription>
-          </Alert>
-        )}
-
-        {!hasLocalData && (
-          <Alert>
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription>
-              Nenhum dado local encontrado. Adicione algumas transações primeiro ou restaure de um backup.
-              <br />
-              <small className="text-xs opacity-75">
-                Procurando por dados na chave: <code>{STORAGE_KEY}</code>
-              </small>
-            </AlertDescription>
-          </Alert>
-        )}
-        
-        {/* Informações dos dados */}
-        <div className="grid grid-cols-2 gap-4 text-sm">
-          <div>
-            <p className="text-muted-foreground">Tamanho dos dados locais:</p>
-            <Badge variant="outline">{getDataSize}</Badge>
-          </div>
-          {lastBackup && (
-            <div>
-              <p className="text-muted-foreground">Último backup:</p>
-              <Badge variant="outline">{lastBackup}</Badge>
+      <Card className="w-full">
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="relative">
+                <img 
+                  className="rounded-full w-10 h-10 border-2 border-white shadow-sm" 
+                  src={session.user?.image || ""} 
+                  alt="Profile"
+                />
+                <div className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-white ${getConnectionStatus.color.replace('text-', 'bg-')}`}></div>
+              </div>
+              <div>
+                <CardTitle className="text-lg">Conta Google</CardTitle>
+                <CardDescription className="flex items-center gap-2">
+                  <span>{session.user?.email}</span>
+                  <Badge variant="outline" className={getConnectionStatus.color}>
+                    {getConnectionStatus.text}
+                  </Badge>
+                </CardDescription>
+              </div>
             </div>
-          )}
-        </div>
-
-        {/* Lista de backups disponíveis */}
-        {availableBackups.length > 0 && (
-          <div>
-            <p className="text-sm font-medium mb-2 flex items-center gap-2">
-              <List className="h-4 w-4" />
-              Backups disponíveis na nuvem:
-            </p>
-            <div className="space-y-1">
-              {availableBackups.map((backup) => (
-                <div key={backup.id} className="text-xs text-muted-foreground flex justify-between">
-                  <span>{backup.name}</span>
-                  <span>{formatDate(backup.modifiedTime)}</span>
+            
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowAdvanced(!showAdvanced)}
+            >
+              <Settings className="h-4 w-4" />
+            </Button>
+          </div>
+        </CardHeader>
+        
+        <CardContent className="space-y-6">
+          {/* Status Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <Card className="p-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-blue-50 rounded-lg">
+                  <HardDrive className="h-4 w-4 text-blue-600" />
                 </div>
-              ))}
-            </div>
+                <div>
+                  <p className="text-sm font-medium">Dados Locais</p>
+                  <p className="text-lg font-bold">{getDataSize}</p>
+                </div>
+              </div>
+            </Card>
+            
+            <Card className="p-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-green-50 rounded-lg">
+                  <Cloud className="h-4 w-4 text-green-600" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium">Backups</p>
+                  <p className="text-lg font-bold">{availableBackups.length}</p>
+                </div>
+              </div>
+            </Card>
+            
+            <Card className="p-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-purple-50 rounded-lg">
+                  <Clock className="h-4 w-4 text-purple-600" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium">Último Backup</p>
+                  <p className="text-sm font-bold">
+                    {lastBackup ? formatDate(lastBackup) : 'Nunca'}
+                  </p>
+                </div>
+              </div>
+            </Card>
           </div>
-        )}
-        
-        {/* Botões de ação */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-          <Button
-            onClick={handleBackup}
-            disabled={isLoading || !hasLocalData}
-            variant="default"
-            className="flex items-center justify-center"
-          >
-            <Upload className="mr-2 h-4 w-4" />
-            {isLoading ? 'Salvando...' : 'Fazer Backup'}
-          </Button>
-          
-          <Button
-            onClick={handleRestore}
-            disabled={isLoading || availableBackups.length === 0}
-            variant="outline"
-            className="flex items-center justify-center"
-          >
-            <Download className="mr-2 h-4 w-4" />
-            {isLoading ? 'Restaurando...' : 'Restaurar Dados'}
-          </Button>
-          
-          <Button
-            onClick={() => signOut()}
-            variant="secondary"
-            className="flex items-center justify-center"
-          >
-            <LogOut className="mr-2 h-4 w-4" />
-            Logout
-          </Button>
-        </div>
-        
-        {/* Botões de controle */}
-        <div className="flex gap-2">
-          <Button
-            onClick={() => loadAvailableBackups(true)}
-            disabled={isLoading}
-            variant="ghost"
-            size="sm"
-            className="text-xs"
-          >
-            🔄 Atualizar Lista
-          </Button>
-          
-          <Button
-            onClick={debugInfo}
-            variant="ghost"
-            size="sm"
-            className="text-xs"
-          >
-            🔍 Debug Info
-          </Button>
-        </div>
-        
-        {/* Informações adicionais */}
-        <div className="text-xs text-muted-foreground space-y-1">
-          <p>💡 <strong>Dica:</strong> Backup automático a cada 5 minutos quando logado</p>
-          <p>🔒 <strong>Segurança:</strong> Dados salvos na pasta privada do app no Drive</p>
-          <p>📱 <strong>Sincronização:</strong> Acesse seus dados de qualquer dispositivo</p>
-          <p>⚠️ <strong>Importante:</strong> Verifique se seu NextAuth está configurado com os escopos corretos do Google Drive</p>
-        </div>
-      </CardContent>
-    </Card>
+
+          {/* Alertas */}
+          {error && (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+
+          {!hasLocalData && (
+            <Alert>
+              <Info className="h-4 w-4" />
+              <AlertDescription>
+                <strong>Nenhum dado local encontrado.</strong>
+                <br />
+                Adicione algumas transações ou restaure de um backup existente.
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {/* Ações Principais */}
+          <div className="flex flex-col sm:flex-row gap-3">
+            <Button
+              onClick={handleBackup}
+              disabled={isLoading || !hasLocalData}
+              className="flex-1"
+              size="lg"
+            >
+              {isLoading ? (
+                <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Upload className="mr-2 h-4 w-4" />
+              )}
+              {isLoading ? 'Salvando...' : 'Fazer Backup'}
+            </Button>
+            
+            <Button
+              onClick={handleRestore}
+              disabled={isLoading || availableBackups.length === 0}
+              variant="outline"
+              className="flex-1"
+              size="lg"
+            >
+              <Download className="mr-2 h-4 w-4" />
+              Restaurar
+            </Button>
+          </div>
+
+          {/* Lista de Backups */}
+          {availableBackups.length > 0 && (
+            <Card>
+              <CardHeader 
+                className="cursor-pointer"
+                onClick={() => setShowBackupDetails(!showBackupDetails)}
+              >
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <List className="h-4 w-4" />
+                    Backups Disponíveis ({availableBackups.length})
+                  </CardTitle>
+                  {showBackupDetails ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                </div>
+              </CardHeader>
+              
+              {showBackupDetails && (
+                <CardContent>
+                  <div className="space-y-2">
+                    {availableBackups.map((backup, index) => (
+                      <div key={backup.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                        <div className="flex items-center gap-3">
+                          <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                          <span className="text-sm font-medium">{backup.name}</span>
+                        </div>
+                        <Badge variant="secondary" className="text-xs">
+                          {formatDate(backup.modifiedTime)}
+                        </Badge>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              )}
+            </Card>
+          )}
+
+          {/* Configurações Avançadas */}
+          {showAdvanced && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Configurações Avançadas</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-medium">Backup Automático</p>
+                    <p className="text-sm text-muted-foreground">
+                      Salva automaticamente a cada 5 minutos
+                    </p>
+                  </div>
+                  <Button
+                    variant={autoBackupEnabled ? "default" : "outline"}
+                    size="sm"
+                    onClick={toggleAutoBackup}
+                  >
+                    {autoBackupEnabled ? "Ativado" : "Desativado"}
+                  </Button>
+                </div>
+                
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-medium">Atualizar Lista</p>
+                    <p className="text-sm text-muted-foreground">
+                      Recarrega os backups disponíveis
+                    </p>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => loadAvailableBackups(true)}
+                    disabled={isLoading}
+                  >
+                    <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+                  </Button>
+                </div>
+                
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-medium">Desconectar Conta</p>
+                    <p className="text-sm text-muted-foreground">
+                      Remove acesso ao Google Drive
+                    </p>
+                  </div>
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={() => signOut()}
+                  >
+                    <LogOut className="mr-1 h-4 w-4" />
+                    Sair
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </CardContent>
+      </Card>
+    </div>
   )
 }
