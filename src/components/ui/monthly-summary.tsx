@@ -35,52 +35,52 @@ export function MonthlySummary({ data, allMonthsData = [] }: MonthlySummaryProps
   return (
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
       <Card>
-        <CardHeader>
-          <CardTitle>Saldo Inicial</CardTitle>
+        <CardHeader className="p-3 sm:p-6 pb-1 sm:pb-2">
+          <CardTitle className="text-sm sm:text-base">Saldo Inicial</CardTitle>
           {previousMonth && (
-            <CardDescription>
+            <CardDescription className="text-xs">
               Transferido de {MONTHS[previousMonth.month]} {previousMonth.year}
             </CardDescription>
           )}
         </CardHeader>
-        <CardContent>
-          <div className={`text-2xl font-bold ${(data.initialBalance || 0) < 0 ? 'text-red-500' : 'text-green-500'}`}>
+        <CardContent  className="p-3 sm:p-6 pt-0">
+          <div className={`text-lg sm:text-2xl font-bold truncate ${(data.initialBalance || 0) < 0 ? 'text-red-500' : 'text-green-500'}`}>
             {formatCurrency(data.initialBalance || 0)}
           </div>
         </CardContent>
       </Card>
       
       <Card>
-        <CardHeader>
-          <CardTitle>Receitas</CardTitle>
+        <CardHeader className="p-3 sm:p-6 pb-1 sm:pb-2">
+          <CardTitle className="text-sm sm:text-base">Receitas</CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold text-green-500">
+        <CardContent  className="p-3 sm:p-6 pt-0">
+          <div className=" text-green-500">
             {formatCurrency(data.totalIncome || 0)}
           </div>
         </CardContent>
       </Card>
       
       <Card>
-        <CardHeader>
-          <CardTitle>Despesas</CardTitle>
+        <CardHeader className="p-3 sm:p-6 pb-1 sm:pb-2">
+          <CardTitle className="text-sm sm:text-base">Despesas</CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold text-red-500">
+        <CardContent  className="p-3 sm:p-6 pt-0">
+          <div className=" text-red-500">
             {formatCurrency(data.totalExpense || 0)}
           </div>
         </CardContent>
       </Card>
       
       <Card>
-        <CardHeader>
-          <CardTitle>Saldo Final</CardTitle>
-          <CardDescription>
+        <CardHeader className="p-3 sm:p-6 pb-1 sm:pb-2">
+          <CardTitle className="text-sm sm:text-base">Saldo Final</CardTitle>
+          <CardDescription className="text-xs">
             Resultado do período
           </CardDescription>
         </CardHeader>
-        <CardContent>
-          <div className={`text-2xl font-bold ${currentBalance < 0 ? 'text-red-500' : 'text-green-500'}`}>
+        <CardContent  className="p-3 sm:p-6 pt-0">
+          <div className={`text-lg sm:text-2xl font-bold truncate ${currentBalance < 0 ? 'text-red-500' : 'text-green-500'}`}>
             {formatCurrency(currentBalance)}
           </div>
         </CardContent>
