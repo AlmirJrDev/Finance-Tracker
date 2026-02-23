@@ -199,9 +199,6 @@ console.log('summary raw:', summaryRes.data)
     (data) => data.month === selectedMonth && data.year === selectedYear
   );
 
-  const availableMonths = allMonthsData.length > 0
-    ? allMonthsData.map((data) => ({ month: data.month, year: data.year }))
-    : [{ month: currentMonth, year: currentYear }];
 
   // ─── Handlers de transações ──────────────────────────────────────────────────
 
@@ -249,9 +246,8 @@ console.log('summary raw:', summaryRes.data)
     }
   };
 
-  const handleApplyRecurringTransactions = async (transactions: Transaction[]) => {
-    // As recorrentes já foram aplicadas via API no componente RecurringTransactions
-    // Só recarrega os dados do mês
+  const handleApplyRecurringTransactions = async () => {
+   
     await loadMonthData(selectedYear, selectedMonth);
   };
 

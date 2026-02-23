@@ -8,33 +8,31 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import {
   Cloud,
-  Download,
-  Upload,
   User,
   LogOut,
   CheckCircle,
   AlertCircle,
   Settings,
   RefreshCw,
-  Clock,
   Shield,
   Zap,
   Info,
 } from 'lucide-react'
 import api from '@/lib/api'
+import Image from 'next/image'
 
 
 export function GoogleDriveSync() {
   const { data: session, status } = useSession()
 
   const [isMounted, setIsMounted] = useState(false)
-  const [isLoading, setIsLoading] = useState(false)
+ 
   const [showAdvanced, setShowAdvanced] = useState(false)
   const [notification, setNotification] = useState<{
     type: 'success' | 'error' | 'info'
     message: string
   } | null>(null)
-  const [userProfile, setUserProfile] = useState<any>(null)
+  const [, setUserProfile] = useState<any>(null)
 
   useEffect(() => {
     setIsMounted(true)
@@ -42,37 +40,23 @@ export function GoogleDriveSync() {
 
   // Quando a sessão do NextAuth estiver disponível, fazer login no backend
   // e obter o JWT próprio
+    const showNotification = useCallback((type: 'success' | 'error' | 'info', message: string) => {
+    setNotification({ type, message })
+    setTimeout(() => setNotification(null), 5000)
+  }, [])
   useEffect(() => {
-    if (!session?.idToken) return
+    const idToken = (session as any)?.idToken
+    if (!idToken) return
 
-    api.loginWithGoogle(session.idToken as string)
+    api.loginWithGoogle(idToken as string)
       .then((data) => {
         setUserProfile(data.user)
       })
       .catch((err) => {
         showNotification('error', 'Erro ao autenticar com o backend: ' + err.message)
       })
-  }, [session?.idToken])
+  }, [session, showNotification ])
 
-  const showNotification = useCallback((type: 'success' | 'error' | 'info', message: string) => {
-    setNotification({ type, message })
-    setTimeout(() => setNotification(null), 5000)
-  }, [])
-
-  // Exemplo: buscar resumo do mês atual para confirmar que o backend está funcionando
-  const handleTestConnection = useCallback(async () => {
-    setIsLoading(true)
-    try {
-      const now = new Date()
-      const result = await api.getMonthlySummary(now.getFullYear(), now.getMonth() + 1)
-      showNotification('success', 'Conexão com backend OK! Dados do mês carregados.')
-      console.log('Monthly summary:', result.data)
-    } catch (err: any) {
-      showNotification('error', 'Erro ao conectar com backend: ' + err.message)
-    } finally {
-      setIsLoading(false)
-    }
-  }, [showNotification])
 
   if (!isMounted || status === 'loading') {
     return (
@@ -170,7 +154,7 @@ export function GoogleDriveSync() {
         <CardHeader>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <img
+              <Image
                 className="rounded-full w-10 h-10 border-2 border-white shadow-sm"
                 src={session.user?.image || ''}
                 alt="Profile"

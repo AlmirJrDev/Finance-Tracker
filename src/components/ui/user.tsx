@@ -6,7 +6,7 @@ import { Button } from './button'
 
 
 export function UserAvatarPopover() {
-  const { data: session, status } = useSession()
+  const { data: session,  } = useSession()
 
   // Função para obter as iniciais do nome
   const getInitials = (name: string | null | undefined) => {
