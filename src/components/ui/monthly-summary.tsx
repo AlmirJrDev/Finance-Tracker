@@ -55,7 +55,7 @@ export function MonthlySummary({ data, allMonthsData = [] }: MonthlySummaryProps
           <CardTitle className="text-sm sm:text-base">Receitas</CardTitle>
         </CardHeader>
         <CardContent  className="p-3 sm:p-6 pt-0">
-          <div className=" text-green-500">
+          <div className="text-lg sm:text-2xl font-bold truncate text-green-500">
             {formatCurrency(data.totalIncome || 0)}
           </div>
         </CardContent>
@@ -66,7 +66,7 @@ export function MonthlySummary({ data, allMonthsData = [] }: MonthlySummaryProps
           <CardTitle className="text-sm sm:text-base">Despesas</CardTitle>
         </CardHeader>
         <CardContent  className="p-3 sm:p-6 pt-0">
-          <div className=" text-red-500">
+          <div className="text-lg sm:text-2xl font-bold truncate text-red-500">
             {formatCurrency(data.totalExpense || 0)}
           </div>
         </CardContent>
