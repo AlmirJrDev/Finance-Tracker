@@ -263,19 +263,14 @@ console.log('summary raw:', summaryRes.data)
 
   if (!session) {
     return (
-      <div className="container mx-auto py-4 px-12 lg:py-8 lg:px-32 flex justify-center items-center min-h-screen">
-        <div className="w-full max-w-md">
-          <h1 className="text-3xl font-bold text-center mb-8">Controle Financeiro</h1>
-          <GoogleDriveSync />
-        </div>
-      </div>
+    <GoogleDriveSync />
     );
   }
 
   return (
     <div className="container mx-auto py-4 px-12 lg:py-8 lg:px-32">
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold">Controle Financeiro</h1>
+       <h1 className="text-xl sm:text-3xl font-bold">Controle Financeiro</h1>
         <div className="flex gap-2">
           <ModeToggle />
           <TutorialGuide />
@@ -300,30 +295,29 @@ console.log('summary raw:', summaryRes.data)
                 onMonthChange={handleMonthChange}
               />
             </div>
-
-            <div className="flex flex-col sm:flex-row gap-2">
-              <Button
-                variant="outline"
-                onClick={() => setShowCategoryManager(true)}
-                className="text-sm"
-              >
-                Gerenciar Categorias
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() => setShowRecurring(!showRecurring)}
-                className="text-sm"
-              >
-                {showRecurring ? 'Voltar ao Resumo' : 'Transações Recorrentes'}
-              </Button>
-              <Button
-                onClick={handleAddTransaction}
-                className="flex items-center justify-center gap-1 text-sm"
-              >
-                <Plus className="h-4 w-4" />
-                <span className="sm:inline">Nova Transação</span>
-              </Button>
-            </div>
+<div className="flex flex-col sm:flex-row gap-2">
+  <Button
+    variant="outline"
+    onClick={() => setShowCategoryManager(true)}
+    className="text-sm"
+  >
+    Categorias
+  </Button>
+  <Button
+    variant="outline"
+    onClick={() => setShowRecurring(!showRecurring)}
+    className="text-sm"
+  >
+    {showRecurring ? 'Voltar' : 'Recorrentes'}
+  </Button>
+  <Button
+    onClick={handleAddTransaction}
+    className="flex items-center justify-center gap-1 text-sm"
+  >
+    <Plus className="h-4 w-4" />
+    Nova Transação
+  </Button>
+</div>
           </div>
         </CardContent>
       </Card>
