@@ -102,7 +102,7 @@ useEffect(() => {
 
   return (
     <Card className="w-full mb-6 bg-card">
-      <CardHeader className="flex flex-row items-center justify-between pb-2">
+     <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between pb-2 gap-2">
         <div>
           <CardTitle>Gastos por Categoria</CardTitle>
           <CardDescription>
@@ -120,21 +120,21 @@ useEffect(() => {
           />
         </div>
       </CardHeader>
-      <CardContent className={`flex w-full p-2 gap-2  justify-between flex-col items-center xl:flex-row    ${categoryData.length > 0 ? 'xl:divide-x' : ''}`}>
+     <CardContent className={`flex w-full p-2 gap-4 justify-between flex-col items-center xl:flex-row ${categoryData.length > 0 ? 'xl:divide-x' : ''}`}>
 
       
 
       {categoryData.length > 0 ? (
-              <ChartContainer config={chartConfig} className="h-68 2xl:h-80 flex-1">
-                <PieChart >
-                  <Pie 
-                    data={categoryData} 
-                    dataKey="value" 
-                    nameKey="name"
-                    cx="50%"
-                    cy="50%"
-                    outerRadius={120}
-                  >
+            <ChartContainer config={chartConfig} className="h-56 sm:h-64 2xl:h-80 flex-1">
+  <PieChart>
+    <Pie
+      data={categoryData}
+      dataKey="value"
+      nameKey="name"
+      cx="50%"
+      cy="50%"
+      outerRadius="45%"  // ← porcentagem em vez de px fixo
+    >
                  
                     {categoryData.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={entry.fill} />
@@ -153,11 +153,14 @@ useEffect(() => {
             )}
 
 {categoryData.length > 0 ? (
-              <ChartContainer config={chartConfig} className="h-64 2xl:h-80  flex-1">
-                <BarChart 
-                  data={categoryData}
-                  margin={{ top: 20, right: 30, left: 30, bottom: 5 }}
-                >
+         <ChartContainer config={chartConfig} className="h-52 sm:h-64 2xl:h-80 flex-1">
+  <BarChart
+    data={categoryData}
+    margin={{ top: 10, right: 10, left: 0, bottom: 5 }}  // ← menos margem
+  >
+    <CartesianGrid strokeDasharray="3 3" vertical={false} />
+    <XAxis dataKey="name" tick={{ fontSize: 11 }} />  // ← fonte menor
+    <YAxis tickFormatter={(value) => `R$${value}`} tick={{ fontSize: 11 }} width={55} />
                   <CartesianGrid strokeDasharray="3 3" vertical={false} />
                   <XAxis dataKey="name" />
                   <YAxis tickFormatter={(value) => `R$${value}`} />
