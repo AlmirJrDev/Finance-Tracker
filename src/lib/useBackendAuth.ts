@@ -1,24 +1,28 @@
 import { useEffect } from 'react'
 import { useSession } from 'next-auth/react'
+import type { Session } from 'next-auth'
 import api from './api'
 
+interface ExtendedSession extends Session {
+  idToken?: string
+}
 
 export function useBackendAuth() {
   const { data: session } = useSession()
+  const extSession = session as ExtendedSession | null
 
   useEffect(() => {
-    if (!session?.idToken) return
+    if (!extSession?.idToken) return
 
-    // Se já tem token válido, não precisa refazer login
     const existing = api.getToken()
     if (existing) return
 
-    api.loginWithGoogle(session.idToken)
+    api.loginWithGoogle(extSession.idToken)
       .then((data) => {
         console.log('Backend autenticado:', data.user.email)
       })
       .catch((err) => {
         console.error('Erro ao autenticar no backend:', err.message)
       })
-  }, [session?.idToken])
+  }, [extSession?.idToken])
 }
