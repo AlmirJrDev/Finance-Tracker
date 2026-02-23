@@ -112,8 +112,8 @@ export default function RecurringExpenseTracker({ data, onUpdateProjections }: R
         <div className="space-y-6">
           {/* Configuração do valor mensal */}
           <div className="flex flex-col gap-4">
-            <div className="flex justify-between items-center">
-              <Label htmlFor="monthlyEstimate" className="text-lg">Estimativa mensal de gastos recorrentes:</Label>
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
+<Label htmlFor="monthlyEstimate" className="text-base font-medium">Estimativa mensal:</Label>
               <div className="flex items-center gap-2">
                 <Input
                   id="monthlyEstimate"
@@ -122,7 +122,7 @@ export default function RecurringExpenseTracker({ data, onUpdateProjections }: R
                   step="10"
                   value={monthlyEstimate}
                   onChange={(e) => setMonthlyEstimate(parseFloat(e.target.value) || 0)}
-                  className="w-32"
+                  className="w-28 sm:w-32" 
                 />
                 <Button
                   variant={isEnabled ? "destructive" : "default"}
@@ -152,7 +152,7 @@ export default function RecurringExpenseTracker({ data, onUpdateProjections }: R
                   </div>
                 </div>
                 
-                <div className="flex justify-between mb-2">
+               <div className="flex flex-col sm:flex-row sm:justify-between gap-2 mb-2">
                   <h3 className="font-medium">Acompanhamento de gastos</h3>
                   <Button 
                     variant="outline" 
@@ -166,7 +166,7 @@ export default function RecurringExpenseTracker({ data, onUpdateProjections }: R
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <h4 className="text-sm font-medium mb-2">Dias passados</h4>
-                    <div className="grid grid-cols-7 gap-2">
+                    <div className="grid grid-cols-7 gap-1">
                       {Array.from({ length: passedDays }).map((_, i) => {
                         const day = i + 1;
                         const isSaved = savedDays.includes(day);
@@ -176,12 +176,12 @@ export default function RecurringExpenseTracker({ data, onUpdateProjections }: R
                             key={`day-${day}`}
                             variant={isSaved ? "default" : "outline"}
                             size="sm"
-                            className={`h-12 ${isSaved ? 'bg-green-100 hover:bg-green-200 text-green-800' : ''}`}
+                            className={`h-10 w-full p-0 text-xs  ${isSaved ? 'bg-green-100 hover:bg-green-200 text-green-800' : ''}`}
                             onClick={() => toggleSavedDay(day)}
                           >
-                            <div className="flex flex-col items-center">
-                              <span>{day}</span>
-                              {isSaved && <CheckCircle className="h-4 w-4 text-green-600" />}
+                            <div className="flex flex-col items-center gap-0">
+                              <span className='text-xs'>{day}</span>
+                              {isSaved && <CheckCircle className="h-3 w-3 text-green-600" />}
                             </div>
                           </Button>
                         );
@@ -192,7 +192,7 @@ export default function RecurringExpenseTracker({ data, onUpdateProjections }: R
                     </p>
                   </div>
                   
-                  <div>
+                  <div className="overflow-x-auto">
                     <h4 className="text-sm font-medium mb-2">Resumo financeiro</h4>
                     <Table>
                       <TableBody>
@@ -218,7 +218,7 @@ export default function RecurringExpenseTracker({ data, onUpdateProjections }: R
                 </div>
                 
                 {showProjection && (
-                  <div>
+                  <div className="overflow-x-auto">
                     <h4 className="text-sm font-medium mb-2">Projeção para os próximos dias</h4>
                     <Table>
                       <TableHeader>
