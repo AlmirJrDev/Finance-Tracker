@@ -55,42 +55,38 @@ export default function CategoryCharts({ data, allMonthsData }: CategoryChartsPr
   const [trend, setTrend] = useState<TrendData>({ value: 0, isUp: true });
   const [showAllMonths, setShowAllMonths] = useState<boolean>(false);
   
-  useEffect(() => {
-    if (!data) return;
-    const dataToProcess = showAllMonths ? allMonthsData : [data];
-    const categories: Record<string, number> = {};
-    dataToProcess.forEach((monthData) => {
-      monthData.dailyBalances.forEach((day) => {
-        day.dailyTransactions.forEach((transaction) => {
-          if (transaction.type === 'saída') {
-            const category = transaction.category || 'Outros';
-            if (!categories[category]) {
-              categories[category] = 0;
-            }
-            categories[category] += transaction.amount;
-          }
-        });
+useEffect(() => {
+  if (!data) return;
+
+  const dataToProcess = showAllMonths ? allMonthsData : [data];
+  const categories: Record<string, number> = {};
+
+  dataToProcess.forEach((monthData) => {
+    monthData.dailyBalances.forEach((day) => {
+      day.dailyTransactions.forEach((transaction) => {
+        if (transaction.type === 'saída') {
+          const category = transaction.category || 'Outros';
+          categories[category] = (categories[category] || 0) + transaction.amount;
+        }
       });
     });
-  
-    const chartData: CategoryDataItem[] = Object.keys(categories).map((category, index) => ({
-      name: category,
-      value: categories[category],
-      fill: COLORS[index % COLORS.length]
-    }));
-    
-    chartData.sort((a, b) => b.value - a.value);
-    
-    setCategoryData(chartData);
-    
-    if (!showAllMonths) {
-      const randomTrend = parseFloat((Math.random() * 10 - 5).toFixed(1));
-      setTrend({
-        value: Math.abs(randomTrend),
-        isUp: randomTrend > 0
-      });
-    }
-  }, [data, allMonthsData, showAllMonths]);
+  });
+
+  const chartData: CategoryDataItem[] = Object.keys(categories).map((category, index) => ({
+    name: category,
+    value: categories[category],
+    fill: COLORS[index % COLORS.length],
+  }));
+
+  chartData.sort((a, b) => b.value - a.value);
+  setCategoryData(chartData);
+
+  if (!showAllMonths) {
+    const randomTrend = parseFloat((Math.random() * 10 - 5).toFixed(1));
+    setTrend({ value: Math.abs(randomTrend), isUp: randomTrend > 0 });
+  }
+  // Adiciona JSON.stringify para forçar re-render quando os dados internos mudam
+}, [JSON.stringify(data?.dailyBalances), showAllMonths]);
 
   const chartConfig: ChartConfig = categoryData.reduce((config, item) => {
     config[item.name] = {

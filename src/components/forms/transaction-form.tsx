@@ -21,10 +21,11 @@ import {
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Transaction } from '@/types/finance';
-import { loadCategories, addCategory } from '@/lib/categories';
 import { PlusCircle } from 'lucide-react';
-import { toast } from 'sonner'; 
+import { toast } from 'sonner';
 import { playNotificationSound } from '@/lib/notification';
+import api from '@/lib/api';
+
 
 type TransactionFormProps = {
   isOpen: boolean;
@@ -33,6 +34,36 @@ type TransactionFormProps = {
   editTransaction?: Transaction | null;
   currentDate: Date;
 };
+
+function getInitialState(editTrans: Transaction | null | undefined, current: Date): Partial<Transaction> {
+  if (editTrans) {
+    return {
+      ...editTrans,
+      date: editTrans.date instanceof Date ? editTrans.date : new Date(editTrans.date),
+    };
+  }
+  return {
+    id: '',
+    date: current,
+    description: '',
+    amount: 0,
+    type: 'entrada' as const,
+    category: '',
+    note: '',
+  };
+}
+
+function createLocalDate(dateString: string): Date {
+  const [year, month, day] = dateString.split('-').map(Number);
+  return new Date(year, month - 1, day);
+}
+
+function formatDateForInput(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
 
 export default function TransactionForm({
   isOpen,
@@ -44,48 +75,27 @@ export default function TransactionForm({
   const [transaction, setTransaction] = useState<Partial<Transaction>>(
     getInitialState(editTransaction, currentDate)
   );
-  const [categories, setCategories] = useState<string[]>([]);
+  // Cada categoria tem id e name (vindo da API)
+  const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
   const [newCategory, setNewCategory] = useState<string>('');
   const [showNewCategory, setShowNewCategory] = useState<boolean>(false);
 
-  // Carrega categorias ao iniciar
+  // Carrega categorias da API
   useEffect(() => {
-    const loadedCategories = loadCategories();
-    setCategories(loadedCategories);
+    api.getCategories()
+      .then((res) => setCategories(res.data.map((c: any) => ({ id: c._id, name: c.name }))))
+      .catch(() => setCategories([]));
   }, []);
 
-  // Este useEffect atualiza o estado do formulário quando editTransaction muda
   useEffect(() => {
     if (isOpen) {
       setTransaction(getInitialState(editTransaction, currentDate));
     }
   }, [editTransaction, currentDate, isOpen]);
 
-  // Função para obter o estado inicial com base no editTransaction ou valores padrão
-  function getInitialState(editTrans: Transaction | null | undefined, current: Date): Partial<Transaction> {
-    if (editTrans) {
-      return {
-        ...editTrans,
-        // Garantir que a data seja um objeto Date
-        date: editTrans.date instanceof Date ? editTrans.date : new Date(editTrans.date)
-      };
-    }
-    return {
-      id: '',
-      date: current,
-      description: '',
-      amount: 0,
-      type: 'entrada' as const,
-      category: '',
-      note: '',
-    };
-  }
-
   const isEditing = Boolean(editTransaction);
 
-  const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
-  ) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setTransaction((prev) => ({
       ...prev,
@@ -93,54 +103,62 @@ export default function TransactionForm({
     }));
   };
 
-  const handleSelectChange = (name: string, value: string) => {
-    setTransaction((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
-  };
-  
-  const handleAddCategory = () => {
-    if (newCategory.trim()) {
-      const updatedCategories = addCategory(newCategory.trim());
-      setCategories(updatedCategories);
-      handleSelectChange('category', newCategory.trim().toLowerCase());
-      setNewCategory('');
-      setShowNewCategory(false);
+  const handleDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const dateString = e.target.value;
+    if (dateString) {
+      setTransaction((prev) => ({ ...prev, date: createLocalDate(dateString) }));
     }
   };
-  
+
+  const handleSelectChange = (name: string, value: string) => {
+    setTransaction((prev) => ({ ...prev, [name]: value }));
+  };
+
+  // Cria nova categoria na API e adiciona à lista local
+  const handleAddCategory = async () => {
+    if (!newCategory.trim()) return;
+    try {
+      const res = await api.createCategory({ name: newCategory.trim() });
+      const created = { id: res.data._id, name: res.data.name };
+      setCategories((prev) => [...prev, created]);
+      handleSelectChange('category', created.id); // salva o ID como valor
+      setNewCategory('');
+      setShowNewCategory(false);
+    } catch (err: any) {
+      toast.error('Erro ao criar categoria', { description: err.message });
+    }
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-      
-    // Validação básica
+
     if (!transaction.description || !transaction.amount || transaction.amount <= 0) {
-      toast.error("Erro de validação", {
-        description: "Por favor, preencha a descrição e um valor válido."
+      toast.error('Erro de validação', {
+        description: 'Por favor, preencha a descrição e um valor válido.',
       });
       return;
     }
-      
-    // Formata a transação final - certifique-se que a data seja um objeto Date válido
+
+    if (!transaction.date) {
+      toast.error('Erro de validação', { description: 'Por favor, selecione uma data válida.' });
+      return;
+    }
+
     const finalTransaction: Transaction = {
       id: transaction.id || `trans-${Date.now()}`,
       date: transaction.date instanceof Date ? transaction.date : new Date(transaction.date || currentDate),
       description: transaction.description || '',
       amount: transaction.amount || 0,
       type: transaction.type as 'entrada' | 'saída',
-      category: (transaction.category || '').toLowerCase(), // Normalizar categoria para lowercase
+      category: transaction.category || '',
       note: transaction.note,
     };
-      
+
     onSave(finalTransaction);
     playNotificationSound();
-    toast.success(isEditing ? "Transação atualizada" : "Transação adicionada", {
-      description: `${transaction.description} foi ${isEditing ? 'atualizada' : 'adicionada'} com sucesso.`
+    toast.success(isEditing ? 'Transação atualizada' : 'Transação adicionada', {
+      description: `${transaction.description} foi ${isEditing ? 'atualizada' : 'adicionada'} com sucesso.`,
     });
-    onClose();
-  };
-
-  const handleCancel = () => {
     onClose();
   };
 
@@ -182,19 +200,10 @@ export default function TransactionForm({
                 type="date"
                 value={
                   transaction.date instanceof Date
-                    ? transaction.date.toISOString().split('T')[0]
-                    : new Date().toISOString().split('T')[0]
+                    ? formatDateForInput(transaction.date)
+                    : formatDateForInput(new Date())
                 }
-                onChange={(e) =>
-                  handleChange({
-                    ...e,
-                    target: {
-                      ...e.target,
-                      name: 'date',
-                      value: new Date(e.target.value),
-                    },
-                  } as any)
-                }
+                onChange={handleDateChange}
               />
             </div>
           </div>
@@ -230,50 +239,41 @@ export default function TransactionForm({
               {showNewCategory ? (
                 <div className="flex space-x-2">
                   <Input
-                    id="newCategory"
-                    name="newCategory"
                     value={newCategory}
                     onChange={(e) => setNewCategory(e.target.value)}
                     placeholder="Nova categoria"
+                    onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddCategory())}
                   />
-                  <Button 
-                    type="button" 
-                    size="sm" 
-                    onClick={handleAddCategory}
-                  >
-                    +
-                  </Button>
+                  <Button type="button" size="sm" onClick={handleAddCategory}>+</Button>
                 </div>
               ) : (
-                <div className="relative">
-                  <Select
-                    value={transaction.category || ''}
-                    onValueChange={(value) => handleSelectChange('category', value)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {categories.map((category) => (
-                        <SelectItem key={category} value={category.toLowerCase()}>
-                          {category}
-                        </SelectItem>
-                      ))}
-                      <div className="py-2 px-2 border-t">
-                        <Button 
-                          type="button" 
-                          variant="ghost" 
-                          size="sm" 
-                          className="w-full flex items-center justify-center gap-1"
-                          onClick={() => setShowNewCategory(true)}
-                        >
-                          <PlusCircle className="h-4 w-4 mr-1" />
-                          Adicionar categoria
-                        </Button>
-                      </div>
-                    </SelectContent>
-                  </Select>
-                </div>
+                <Select
+                  value={transaction.category || ''}
+                  onValueChange={(value) => handleSelectChange('category', value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {categories.map((cat) => (
+                      <SelectItem key={cat.id} value={cat.id}>
+                        {cat.name}
+                      </SelectItem>
+                    ))}
+                    <div className="py-2 px-2 border-t">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="w-full flex items-center justify-center gap-1"
+                        onClick={() => setShowNewCategory(true)}
+                      >
+                        <PlusCircle className="h-4 w-4 mr-1" />
+                        Adicionar categoria
+                      </Button>
+                    </div>
+                  </SelectContent>
+                </Select>
               )}
             </div>
           </div>
@@ -291,12 +291,10 @@ export default function TransactionForm({
           </div>
 
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={handleCancel}>
+            <Button type="button" variant="outline" onClick={onClose}>
               Cancelar
             </Button>
-            <Button type="submit">
-              {isEditing ? 'Atualizar' : 'Adicionar'}
-            </Button>
+            <Button type="submit">{isEditing ? 'Atualizar' : 'Adicionar'}</Button>
           </DialogFooter>
         </form>
       </DialogContent>
