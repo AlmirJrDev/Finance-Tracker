@@ -44,18 +44,18 @@ export function GoogleDriveSync() {
     setNotification({ type, message })
     setTimeout(() => setNotification(null), 5000)
   }, [])
-  useEffect(() => {
-    const idToken = (session as any)?.idToken
-    if (!idToken) return
+useEffect(() => {
+  const idToken = (session as any)?.idToken
+  if (!idToken) return
 
-    api.loginWithGoogle(idToken as string)
-      .then((data) => {
-        setUserProfile(data.user)
-      })
-      .catch((err) => {
-        showNotification('error', 'Erro ao autenticar com o backend: ' + err.message)
-      })
-  }, [session, showNotification ])
+  api.loginWithGoogle(idToken)  // ← usar a variável, não session.idToken
+    .then((data) => {
+      setUserProfile(data.user)
+    })
+    .catch((err) => {
+      showNotification('error', 'Erro ao autenticar com o backend: ' + err.message)
+    })
+}, [(session as any)?.idToken, showNotification])
 
 
   if (!isMounted || status === 'loading') {
