@@ -79,6 +79,16 @@ export default function TransactionForm({
   const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
   const [newCategory, setNewCategory] = useState<string>('');
   const [showNewCategory, setShowNewCategory] = useState<boolean>(false);
+  const [isLoadingCategories, setIsLoadingCategories] = useState(false)
+
+// No useEffect de categorias:
+useEffect(() => {
+  setIsLoadingCategories(true)
+  api.getCategories()
+    .then((res) => setCategories(res.data.map((c: any) => ({ id: c._id, name: c.name }))))
+    .catch(() => setCategories([]))
+    .finally(() => setIsLoadingCategories(false))
+}, [])
 
   // Carrega categorias da API
   useEffect(() => {
@@ -234,48 +244,50 @@ export default function TransactionForm({
               />
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="category">Categoria</Label>
-              {showNewCategory ? (
-                <div className="flex space-x-2">
-                  <Input
-                    value={newCategory}
-                    onChange={(e) => setNewCategory(e.target.value)}
-                    placeholder="Nova categoria"
-                    onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddCategory())}
-                  />
-                  <Button type="button" size="sm" onClick={handleAddCategory}>+</Button>
-                </div>
-              ) : (
-               <Select
-  value={transaction.category || ''}
-  onValueChange={(value) => handleSelectChange('category', value)}
->
-  <SelectTrigger>
-    <SelectValue placeholder="Selecione" />
-  </SelectTrigger>
-  <SelectContent position="popper" className="max-h-60 overflow-y-auto">
-    {categories.map((cat) => (
-      <SelectItem key={cat.id} value={cat.id}>
-        {cat.name}
-      </SelectItem>
-    ))}
-    <div className="py-2 px-2 border-t">
-      <Button
-        type="button"
-        variant="ghost"
-        size="sm"
-        className="w-full flex items-center justify-center gap-1"
-        onClick={() => setShowNewCategory(true)}
-      >
-        <PlusCircle className="h-4 w-4 mr-1" />
-        Adicionar categoria
-      </Button>
+           <div className="space-y-2">
+  <Label htmlFor="category">Categoria</Label>
+  {showNewCategory ? (
+    <div className="flex space-x-2">
+      <Input
+        value={newCategory}
+        onChange={(e) => setNewCategory(e.target.value)}
+        placeholder="Nova categoria"
+        onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddCategory())}
+      />
+      <Button type="button" size="sm" onClick={handleAddCategory}>+</Button>
     </div>
-  </SelectContent>
-</Select>
-              )}
-            </div>
+  ) : isLoadingCategories ? (
+    <div className="h-9 w-full rounded-md border bg-muted animate-pulse" />
+  ) : (
+    <Select
+      value={transaction.category || ''}
+      onValueChange={(value) => handleSelectChange('category', value)}
+    >
+      <SelectTrigger>
+        <SelectValue placeholder="Selecione" />
+      </SelectTrigger>
+      <SelectContent position="popper" className="max-h-60 overflow-y-auto">
+        {categories.map((cat) => (
+          <SelectItem key={cat.id} value={cat.id}>
+            {cat.name}
+          </SelectItem>
+        ))}
+        <div className="py-2 px-2 border-t">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="w-full flex items-center justify-center gap-1"
+            onClick={() => setShowNewCategory(true)}
+          >
+            <PlusCircle className="h-4 w-4 mr-1" />
+            Adicionar categoria
+          </Button>
+        </div>
+      </SelectContent>
+    </Select>
+  )}
+</div>
           </div>
 
           <div className="space-y-2">

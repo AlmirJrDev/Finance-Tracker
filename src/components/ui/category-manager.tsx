@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
-import { Plus, Edit, Trash2, Loader2 } from 'lucide-react';
+import { Plus, Edit, Trash2, Loader2, X } from 'lucide-react';
 import { ScrollArea } from './scroll-area';
 import { toast } from 'sonner';
 import api from '@/lib/api';
@@ -92,10 +92,15 @@ export default function CategoryManager({ isOpen, onClose }: CategoryManagerProp
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-3xl sm:max-h-[80vh] flex flex-col">
+     <DialogContent className="max-w-3xl h-[90vh] sm:h-auto sm:max-h-[80vh] flex flex-col">
         <DialogHeader>
-          <DialogTitle>Gerenciar Categorias</DialogTitle>
-          <DialogDescription>Adicione ou altere uma categoria</DialogDescription>
+         <div>
+    <DialogTitle>Gerenciar Categorias</DialogTitle>
+    <DialogDescription>Adicione ou altere uma categoria</DialogDescription>
+  </div>
+  <Button variant="ghost" size="icon" onClick={onClose} className="h-8 w-8 -mt-1">
+    <X className="h-4 w-4" />
+  </Button>
         </DialogHeader>
 
         <div className="flex gap-2 mb-4">
@@ -186,9 +191,9 @@ export default function CategoryManager({ isOpen, onClose }: CategoryManagerProp
           </Card>
         </ScrollArea>
 
-        <DialogFooter className="mt-4 pt-2">
-          <Button onClick={onClose}>Fechar</Button>
-        </DialogFooter>
+<DialogFooter className="mt-2 pt-2 border-t flex-shrink-0">
+  <Button onClick={onClose}>Fechar</Button>
+</DialogFooter>
       </DialogContent>
     </Dialog>
   );
