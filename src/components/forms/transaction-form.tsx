@@ -247,33 +247,33 @@ export default function TransactionForm({
                   <Button type="button" size="sm" onClick={handleAddCategory}>+</Button>
                 </div>
               ) : (
-                <Select
-                  value={transaction.category || ''}
-                  onValueChange={(value) => handleSelectChange('category', value)}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {categories.map((cat) => (
-                      <SelectItem key={cat.id} value={cat.id}>
-                        {cat.name}
-                      </SelectItem>
-                    ))}
-                    <div className="py-2 px-2 border-t">
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="w-full flex items-center justify-center gap-1"
-                        onClick={() => setShowNewCategory(true)}
-                      >
-                        <PlusCircle className="h-4 w-4 mr-1" />
-                        Adicionar categoria
-                      </Button>
-                    </div>
-                  </SelectContent>
-                </Select>
+               <Select
+  value={transaction.category || ''}
+  onValueChange={(value) => handleSelectChange('category', value)}
+>
+  <SelectTrigger>
+    <SelectValue placeholder="Selecione" />
+  </SelectTrigger>
+  <SelectContent position="popper" className="max-h-60 overflow-y-auto">
+    {categories.map((cat) => (
+      <SelectItem key={cat.id} value={cat.id}>
+        {cat.name}
+      </SelectItem>
+    ))}
+    <div className="py-2 px-2 border-t">
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        className="w-full flex items-center justify-center gap-1"
+        onClick={() => setShowNewCategory(true)}
+      >
+        <PlusCircle className="h-4 w-4 mr-1" />
+        Adicionar categoria
+      </Button>
+    </div>
+  </SelectContent>
+</Select>
               )}
             </div>
           </div>

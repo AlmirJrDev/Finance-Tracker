@@ -33,7 +33,7 @@ export function MonthlySummary({ data, allMonthsData = [] }: MonthlySummaryProps
   const currentBalance = (data.initialBalance || 0) + data.performance;
   
   return (
-    <div className="grid grid-cols-4 gap-4 mb-6">
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
       <Card>
         <CardHeader>
           <CardTitle>Saldo Inicial</CardTitle>
