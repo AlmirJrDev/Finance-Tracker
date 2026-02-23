@@ -92,16 +92,16 @@ export default function CategoryManager({ isOpen, onClose }: CategoryManagerProp
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-     <DialogContent className="max-w-3xl h-[90vh] sm:h-auto sm:max-h-[80vh] flex flex-col">
-        <DialogHeader>
-         <div>
+<DialogContent className="max-w-3xl flex flex-col max-h-[90vh] p-4 gap-0">
+   <DialogHeader className="flex flex-row items-start justify-between space-y-0 pb-2">
+  <div>
     <DialogTitle>Gerenciar Categorias</DialogTitle>
     <DialogDescription>Adicione ou altere uma categoria</DialogDescription>
   </div>
-  <Button variant="ghost" size="icon" onClick={onClose} className="h-8 w-8 -mt-1">
+  <Button variant="ghost" size="icon" onClick={onClose} className="h-8 w-8 flex-shrink-0">
     <X className="h-4 w-4" />
   </Button>
-        </DialogHeader>
+</DialogHeader>
 
         <div className="flex gap-2 mb-4">
           <Input
@@ -191,7 +191,7 @@ export default function CategoryManager({ isOpen, onClose }: CategoryManagerProp
           </Card>
         </ScrollArea>
 
-<DialogFooter className="mt-2 pt-2 border-t flex-shrink-0">
+<DialogFooter className="pt-3 border-t mt-2 flex-shrink-0">
   <Button onClick={onClose}>Fechar</Button>
 </DialogFooter>
       </DialogContent>
