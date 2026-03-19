@@ -54,43 +54,40 @@ export default function CategoryCharts({ data, allMonthsData }: CategoryChartsPr
   const [categoryData, setCategoryData] = useState<CategoryDataItem[]>([]);
   const [trend, setTrend] = useState<TrendData>({ value: 0, isUp: true });
   const [showAllMonths, setShowAllMonths] = useState<boolean>(false);
-  
-  useEffect(() => {
-    if (!data) return;
-    const dataToProcess = showAllMonths ? allMonthsData : [data];
-    const categories: Record<string, number> = {};
-    dataToProcess.forEach((monthData) => {
-      monthData.dailyBalances.forEach((day) => {
-        day.dailyTransactions.forEach((transaction) => {
-          if (transaction.type === 'saída') {
-            const category = transaction.category || 'Outros';
-            if (!categories[category]) {
-              categories[category] = 0;
-            }
-            categories[category] += transaction.amount;
-          }
-        });
+
+  const dailyBalancesKey = JSON.stringify(data?.dailyBalances);
+
+useEffect(() => {
+  if (!data) return;
+
+  const dataToProcess = showAllMonths ? allMonthsData : [data];
+  const categories: Record<string, number> = {};
+
+  dataToProcess.forEach((monthData) => {
+    monthData.dailyBalances.forEach((day) => {
+      day.dailyTransactions.forEach((transaction) => {
+        if (transaction.type === 'saída') {
+          const category = transaction.category || 'Outros';
+          categories[category] = (categories[category] || 0) + transaction.amount;
+        }
       });
     });
-  
-    const chartData: CategoryDataItem[] = Object.keys(categories).map((category, index) => ({
-      name: category,
-      value: categories[category],
-      fill: COLORS[index % COLORS.length]
-    }));
-    
-    chartData.sort((a, b) => b.value - a.value);
-    
-    setCategoryData(chartData);
-    
-    if (!showAllMonths) {
-      const randomTrend = parseFloat((Math.random() * 10 - 5).toFixed(1));
-      setTrend({
-        value: Math.abs(randomTrend),
-        isUp: randomTrend > 0
-      });
-    }
-  }, [data, allMonthsData, showAllMonths]);
+  });
+
+  const chartData: CategoryDataItem[] = Object.keys(categories).map((category, index) => ({
+    name: category,
+    value: categories[category],
+    fill: COLORS[index % COLORS.length],
+  }));
+
+  chartData.sort((a, b) => b.value - a.value);
+  setCategoryData(chartData);
+
+  if (!showAllMonths) {
+    const randomTrend = parseFloat((Math.random() * 10 - 5).toFixed(1));
+    setTrend({ value: Math.abs(randomTrend), isUp: randomTrend > 0 });
+  }
+}, [dailyBalancesKey, showAllMonths, allMonthsData, data]);
 
   const chartConfig: ChartConfig = categoryData.reduce((config, item) => {
     config[item.name] = {
@@ -105,7 +102,7 @@ export default function CategoryCharts({ data, allMonthsData }: CategoryChartsPr
 
   return (
     <Card className="w-full mb-6 bg-card">
-      <CardHeader className="flex flex-row items-center justify-between pb-2">
+     <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between pb-2 gap-2">
         <div>
           <CardTitle>Gastos por Categoria</CardTitle>
           <CardDescription>
@@ -123,21 +120,21 @@ export default function CategoryCharts({ data, allMonthsData }: CategoryChartsPr
           />
         </div>
       </CardHeader>
-      <CardContent className={`flex w-full p-2 gap-2  justify-between flex-col items-center xl:flex-row    ${categoryData.length > 0 ? 'xl:divide-x' : ''}`}>
+     <CardContent className={`flex w-full p-2 gap-4 justify-between flex-col items-center xl:flex-row ${categoryData.length > 0 ? 'xl:divide-x' : ''}`}>
 
       
 
       {categoryData.length > 0 ? (
-              <ChartContainer config={chartConfig} className="h-68 2xl:h-80 flex-1">
-                <PieChart >
-                  <Pie 
-                    data={categoryData} 
-                    dataKey="value" 
-                    nameKey="name"
-                    cx="50%"
-                    cy="50%"
-                    outerRadius={120}
-                  >
+            <ChartContainer config={chartConfig} className="h-56 sm:h-64 2xl:h-80 flex-1">
+  <PieChart>
+    <Pie
+      data={categoryData}
+      dataKey="value"
+      nameKey="name"
+      cx="50%"
+      cy="50%"
+      outerRadius="45%"  // ← porcentagem em vez de px fixo
+    >
                  
                     {categoryData.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={entry.fill} />
@@ -156,11 +153,14 @@ export default function CategoryCharts({ data, allMonthsData }: CategoryChartsPr
             )}
 
 {categoryData.length > 0 ? (
-              <ChartContainer config={chartConfig} className="h-64 2xl:h-80  flex-1">
-                <BarChart 
-                  data={categoryData}
-                  margin={{ top: 20, right: 30, left: 30, bottom: 5 }}
-                >
+         <ChartContainer config={chartConfig} className="h-52 sm:h-64 2xl:h-80 flex-1">
+  <BarChart
+    data={categoryData}
+    margin={{ top: 10, right: 10, left: 0, bottom: 5 }}  // ← menos margem
+  >
+    <CartesianGrid strokeDasharray="3 3" vertical={false} />
+    <XAxis dataKey="name" tick={{ fontSize: 11 }} />  // ← fonte menor
+    <YAxis tickFormatter={(value) => `R$${value}`} tick={{ fontSize: 11 }} width={55} />
                   <CartesianGrid strokeDasharray="3 3" vertical={false} />
                   <XAxis dataKey="name" />
                   <YAxis tickFormatter={(value) => `R$${value}`} />

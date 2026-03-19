@@ -1,483 +1,176 @@
 'use client'
 
-import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react'
+import React, { useEffect, useState, useCallback } from 'react'
 import { useSession, signIn, signOut } from 'next-auth/react'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
-import { Cloud, Download, Upload, User, LogOut, CheckCircle, AlertCircle, List } from 'lucide-react'
-import { useGoogleDriveSync } from '@/service/useGoogleDriveSync'
+import { LogOut, CheckCircle, AlertCircle, Settings } from 'lucide-react'
+import api from '@/lib/api'
+import Image from 'next/image'
 
 export function GoogleDriveSync() {
   const { data: session, status } = useSession()
-  const { 
-    isLoading, 
-    error, 
-    syncLocalStorageToGoogleDrive, 
-    restoreFromGoogleDrive,
-    autoBackup,
-    listBackups,
-    clearCache
-  } = useGoogleDriveSync()
+  const [isMounted, setIsMounted] = useState(false)
+  const [showAdvanced, setShowAdvanced] = useState(false)
+  const [notification, setNotification] = useState<{
+    type: 'success' | 'error' | 'info'
+    message: string
+  } | null>(null)
+  const [, setUserProfile] = useState<any>(null)
 
-  const [lastBackup, setLastBackup] = useState<string | null>(null)
-  const [backupStatus, setBackupStatus] = useState<'idle' | 'success' | 'error'>('idle')
-  const [availableBackups, setAvailableBackups] = useState<Array<{id: string, name: string, modifiedTime: string}>>([])
-  const [isMounted, setIsMounted] = useState(false) // Track if component is mounted
-  
-  // Refs para controlar chamadas e intervalos
-  const autoBackupIntervalRef = useRef<NodeJS.Timeout | null>(null)
-  const isLoadingBackupsRef = useRef(false)
-  const lastBackupLoadTimeRef = useRef<number>(0)
+  useEffect(() => { setIsMounted(true) }, [])
 
-  // ✅ CONSTANTES - movidas para fora dos useEffects
-  const STORAGE_KEY = 'finance-tracker-data'
-  const BACKUP_FILENAME = 'finance-tracker-backup.json'
-  const AUTO_BACKUP_INTERVAL = 5 * 60 * 1000 // 5 minutos
-  const BACKUP_LIST_CACHE_TIME = 30 * 1000 // 30 segundos
-
-  // ✅ Track mount state
-  useEffect(() => {
-    setIsMounted(true)
+  const showNotification = useCallback((type: 'success' | 'error' | 'info', message: string) => {
+    setNotification({ type, message })
+    setTimeout(() => setNotification(null), 5000)
   }, [])
 
-  // ✅ Safe localStorage access helper
-  const getLocalStorageItem = useCallback((key: string): string | null => {
-    if (typeof window === 'undefined') return null
-    try {
-      return localStorage.getItem(key)
-    } catch (error) {
-      console.error('Error accessing localStorage:', error)
-      return null
-    }
-  }, [])
-
-  const setLocalStorageItem = useCallback((key: string, value: string): void => {
-    if (typeof window === 'undefined') return
-    try {
-      localStorage.setItem(key, value)
-    } catch (error) {
-      console.error('Error setting localStorage:', error)
-    }
-  }, [])
-
-  // ✅ Função otimizada para carregar backups com cache
-  const loadAvailableBackups = useCallback(async (forceRefresh = false) => {
-    // Evita chamadas simultâneas
-    if (isLoadingBackupsRef.current) {
-      console.log('🔄 Carregamento de backups já em progresso, ignorando...')
-      return
-    }
-
-    // Cache por 30 segundos (evita recarregar constantemente)
-    const now = Date.now()
-    if (!forceRefresh && (now - lastBackupLoadTimeRef.current) < BACKUP_LIST_CACHE_TIME) {
-      console.log('📦 Usando cache de backups...')
-      return
-    }
-
-    if (!session?.accessToken) {
-      console.log('❌ Sem token de acesso para carregar backups')
-      return
-    }
-
-    isLoadingBackupsRef.current = true
-    lastBackupLoadTimeRef.current = now
-
-    try {
-      console.log('🔄 Carregando lista de backups...')
-      const backups = await listBackups()
-      setAvailableBackups(backups)
-      console.log(`✅ ${backups.length} backups carregados`)
-    } catch (error) {
-      console.error('❌ Erro ao carregar backups:', error)
-    } finally {
-      isLoadingBackupsRef.current = false
-    }
-  }, [listBackups, session?.accessToken])
-
-  // ✅ Carrega informações do último backup (apenas uma vez)
   useEffect(() => {
-    if (!isMounted) return
-    
-    const saved = getLocalStorageItem('lastBackupTime')
-    if (saved) {
-      setLastBackup(saved)
-    }
-  }, [isMounted, getLocalStorageItem])
+    const idToken = (session as any)?.idToken
+    if (!idToken) return
+    api.loginWithGoogle(idToken)
+      .then((data) => setUserProfile(data.user))
+      .catch((err) => showNotification('error', 'Erro ao autenticar: ' + err.message))
+  }, [(session as any)?.idToken, showNotification])
 
-  // ✅ Carrega backups quando usuário faz login (com controle)
-  useEffect(() => {
-    if (session?.accessToken) {
-      console.log('👤 Usuário logado, carregando backups...')
-      loadAvailableBackups(true) // Force refresh no login
-    } else {
-      // Limpa dados quando deslogado
-      setAvailableBackups([])
-      clearCache()
-      console.log('👋 Usuário deslogado, limpando dados...')
-    }
-  }, [session?.accessToken, loadAvailableBackups, clearCache])
-
-  // ✅ Backup automático otimizado (sem dependências que mudam constantemente)
-  useEffect(() => {
-    if (!isMounted) return
-
-    // Limpa interval anterior
-    if (autoBackupIntervalRef.current) {
-      clearInterval(autoBackupIntervalRef.current)
-      autoBackupIntervalRef.current = null
-    }
-
-    if (session?.accessToken) {
-      // Verifica se há dados para fazer backup
-      const hasData = getLocalStorageItem(STORAGE_KEY)
-      
-      if (hasData) {
-        console.log('⏰ Iniciando backup automático a cada 5 minutos...')
-        
-        autoBackupIntervalRef.current = setInterval(async () => {
-          console.log('🔄 Executando backup automático...')
-          try {
-            await autoBackup(STORAGE_KEY, BACKUP_FILENAME)
-            console.log('✅ Backup automático concluído')
-          } catch (error) {
-            console.warn('⚠️ Backup automático falhou:', error)
-          }
-        }, AUTO_BACKUP_INTERVAL)
-      } else {
-        console.log('📭 Nenhum dado local encontrado para backup automático')
-      }
-    }
-
-    // Cleanup function
-    return () => {
-      if (autoBackupIntervalRef.current) {
-        clearInterval(autoBackupIntervalRef.current)
-        autoBackupIntervalRef.current = null
-        console.log('🧹 Backup automático cancelado')
-      }
-    }
-  }, [session?.accessToken, autoBackup, isMounted, getLocalStorageItem]) // Dependências mínimas
-
-  // ✅ Funções de ação otimizadas
-  const handleBackup = useCallback(async () => {
-    // Verifica se há dados para fazer backup
-    const hasData = getLocalStorageItem(STORAGE_KEY)
-    if (!hasData) {
-      alert('⚠️ Nenhum dado encontrado para fazer backup')
-      return
-    }
-
-    console.log('🔄 Iniciando backup manual...')
-    const success = await syncLocalStorageToGoogleDrive(STORAGE_KEY, BACKUP_FILENAME)
-    
-    if (success) {
-      const now = new Date().toLocaleString('pt-BR')
-      setLastBackup(now)
-      setBackupStatus('success')
-      setLocalStorageItem('lastBackupTime', now)
-      
-      // Recarrega lista de backups após backup bem-sucedido
-      await loadAvailableBackups(true)
-      
-      // Mostra sucesso por 3 segundos
-      setTimeout(() => setBackupStatus('idle'), 3000)
-      
-      alert('✅ Backup realizado com sucesso!')
-      console.log('✅ Backup manual concluído')
-    } else {
-      setBackupStatus('error')
-      setTimeout(() => setBackupStatus('idle'), 3000)
-      alert(`❌ Erro no backup: ${error}`)
-      console.error('❌ Erro no backup manual:', error)
-    }
-  }, [syncLocalStorageToGoogleDrive, loadAvailableBackups, error, getLocalStorageItem, setLocalStorageItem])
-
-  const handleRestore = useCallback(async () => {
-    const confirmed = confirm(
-      '⚠️ ATENÇÃO: Isso irá sobrescrever todos os seus dados locais com os dados do backup na nuvem.\n\n' +
-      'Certifique-se de fazer um backup dos dados atuais se necessário.\n\n' +
-      'Deseja continuar?'
-    )
-    
-    if (!confirmed) return
-
-    console.log('🔄 Iniciando restauração...')
-    const success = await restoreFromGoogleDrive(BACKUP_FILENAME, STORAGE_KEY)
-    
-    if (success) {
-      alert('✅ Dados restaurados com sucesso!\n\nA página será recarregada para aplicar as mudanças.')
-      console.log('✅ Restauração concluída, recarregando página...')
-      // Recarrega a página para aplicar os dados restaurados
-      window.location.reload()
-    } else {
-      alert(`❌ Erro na restauração: ${error}`)
-      console.error('❌ Erro na restauração:', error)
-    }
-  }, [restoreFromGoogleDrive, error])
-
-  // ✅ Funções auxiliares memoizadas com verificação de mounting
-  const getDataSize = useMemo(() => {
-    if (!isMounted) return '0 KB'
-    
-    const data = getLocalStorageItem(STORAGE_KEY)
-    if (!data) return '0 KB'
-    
-    const bytes = new Blob([data]).size
-    if (bytes < 1024) return `${bytes} B`
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
-  }, [STORAGE_KEY, isMounted, getLocalStorageItem])
-
-  const hasLocalData = useMemo(() => {
-    if (!isMounted) return false
-    
-    const data = getLocalStorageItem(STORAGE_KEY)
-    return data && data.length > 0
-  }, [STORAGE_KEY, isMounted, getLocalStorageItem])
-
-  const formatDate = useCallback((dateString: string) => {
-    try {
-      return new Date(dateString).toLocaleString('pt-BR')
-    } catch {
-      return dateString
-    }
-  }, [])
-
-  // ✅ Debug function otimizada
-  const debugInfo = useCallback(() => {
-    if (typeof window !== 'undefined') {
-      const data = getLocalStorageItem(STORAGE_KEY)
-      console.group('🔍 DEBUG INFO')
-      console.log('Chave localStorage:', STORAGE_KEY)
-      console.log('Dados encontrados:', data ? 'SIM' : 'NÃO')
-      console.log('Tamanho dos dados:', data ? data.length : 0)
-      console.log('Todas as chaves no localStorage:', Object.keys(localStorage))
-      console.log('Session status:', status)
-      console.log('Access token:', session?.accessToken ? 'PRESENTE' : 'AUSENTE')
-      console.log('Backups disponíveis:', availableBackups.length)
-      console.log('Loading state:', isLoading)
-      console.log('Error state:', error)
-      console.log('Component mounted:', isMounted)
-      console.groupEnd()
-    }
-  }, [STORAGE_KEY, status, session?.accessToken, availableBackups.length, isLoading, error, isMounted, getLocalStorageItem])
-
-  // ✅ Debug apenas uma vez no mount
-  useEffect(() => {
-    if (isMounted) {
-      debugInfo()
-    }
-  }, [isMounted]) // Executa apenas quando o componente está montado
-
-  // ✅ Cleanup geral no unmount
-  useEffect(() => {
-    return () => {
-      if (autoBackupIntervalRef.current) {
-        clearInterval(autoBackupIntervalRef.current)
-      }
-    }
-  }, [])
-
-  // ✅ Prevent rendering during SSR for localStorage-dependent content
-  if (!isMounted) {
+  if (!isMounted || status === 'loading') {
     return (
-      <Card className="w-full">
-        <CardContent className="p-6">
-          <div className="flex justify-center items-center gap-2">
-            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500"></div>
-            <span>Carregando...</span>
-          </div>
-        </CardContent>
-      </Card>
-    )
-  }
-
-  if (status === 'loading') {
-    return (
-      <Card className="w-full">
-        <CardContent className="p-6">
-          <div className="flex justify-center items-center gap-2">
-            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500"></div>
-            <span>Carregando...</span>
-          </div>
-        </CardContent>
-      </Card>
+      <div className="min-h-screen flex items-center justify-center bg-[#0a0a0a]">
+        <div className="w-8 h-8 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin" />
+      </div>
     )
   }
 
   if (!session) {
     return (
-      <Card className="w-full">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Cloud className="h-5 w-5" />
-            Backup na Nuvem
-          </CardTitle>
-          <CardDescription>
-            Faça login com Google para sincronizar seus dados financeiros na nuvem
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            <div className="text-sm text-muted-foreground">
-              <p>• Seus dados ficam seguros no Google Drive</p>
-              <p>• Acesse de qualquer dispositivo</p>
-              <p>• Backup automático quando logado</p>
-            </div>
-            
-            <Button
-              onClick={() => signIn('google')}
-              disabled={isLoading}
-              className="w-full"
-            >
-              <User className="mr-2 h-4 w-4" />
-              Fazer Login com Google
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-    )
-  }
-
-  return (
-    <Card className="w-full">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Cloud className="h-5 w-5" />
-          Backup na Nuvem
-          {backupStatus === 'success' && <CheckCircle className="h-4 w-4 text-green-500" />}
-          {backupStatus === 'error' && <AlertCircle className="h-4 w-4 text-red-500" />}
-        </CardTitle>
-        <CardDescription>
-          Logado como: <strong>{session.user?.email}</strong>
-        </CardDescription>
-      </CardHeader>
-      
-      <CardContent className="space-y-4">
-        {error && (
-          <Alert variant="destructive">
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        )}
-
-        {backupStatus === 'success' && (
-          <Alert>
-            <CheckCircle className="h-4 w-4" />
-            <AlertDescription>Backup realizado com sucesso!</AlertDescription>
-          </Alert>
-        )}
-
-        {!hasLocalData && (
-          <Alert>
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription>
-              Nenhum dado local encontrado. Adicione algumas transações primeiro ou restaure de um backup.
-              <br />
-              <small className="text-xs opacity-75">
-                Procurando por dados na chave: <code>{STORAGE_KEY}</code>
-              </small>
-            </AlertDescription>
-          </Alert>
-        )}
-        
-        {/* Informações dos dados */}
-        <div className="grid grid-cols-2 gap-4 text-sm">
-          <div>
-            <p className="text-muted-foreground">Tamanho dos dados locais:</p>
-            <Badge variant="outline">{getDataSize}</Badge>
-          </div>
-          {lastBackup && (
-            <div>
-              <p className="text-muted-foreground">Último backup:</p>
-              <Badge variant="outline">{lastBackup}</Badge>
-            </div>
-          )}
+      <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center p-4 relative overflow-hidden">
+        {/* Background decorativo */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute -top-40 -right-40 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl" />
+          <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-emerald-500/5 rounded-full blur-3xl" />
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-emerald-900/10 rounded-full blur-3xl" />
+          <div
+            className="absolute inset-0 opacity-[0.03]"
+            style={{
+              backgroundImage: 'linear-gradient(#fff 1px, transparent 1px), linear-gradient(90deg, #fff 1px, transparent 1px)',
+              backgroundSize: '60px 60px',
+            }}
+          />
         </div>
 
-        {/* Lista de backups disponíveis */}
-        {availableBackups.length > 0 && (
-          <div>
-            <p className="text-sm font-medium mb-2 flex items-center gap-2">
-              <List className="h-4 w-4" />
-              Backups disponíveis na nuvem:
+        <div className="w-full max-w-sm relative z-10">
+          {/* Logo */}
+          <div className="flex flex-col items-center mb-10">
+            <div className="w-16 h-16 rounded-2xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center mb-4 shadow-lg shadow-emerald-500/10">
+              <svg className="w-8 h-8 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+                  d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <h1 className="text-2xl font-semibold text-white tracking-tight">Controle Financeiro</h1>
+            <p className="text-sm text-zinc-500 mt-1">Gerencie suas finanças com simplicidade</p>
+          </div>
+
+          {/* Card */}
+          <div className="bg-zinc-900/80 backdrop-blur-sm border border-zinc-800 rounded-2xl p-8 shadow-2xl">
+            <p className="text-zinc-400 text-sm text-center mb-6 leading-relaxed">
+              Entre com sua conta Google para acessar seus dados de qualquer dispositivo
             </p>
-            <div className="space-y-1">
-              {availableBackups.map((backup) => (
-                <div key={backup.id} className="text-xs text-muted-foreground flex justify-between">
-                  <span>{backup.name}</span>
-                  <span>{formatDate(backup.modifiedTime)}</span>
+
+            <button
+              onClick={() => signIn('google')}
+              className="w-full flex items-center justify-center gap-3 bg-white hover:bg-zinc-100 text-zinc-900 font-medium text-sm py-3 px-4 rounded-xl transition-all duration-200 hover:shadow-lg hover:shadow-white/10 active:scale-[0.98]"
+            >
+              <svg className="w-5 h-5 flex-shrink-0" viewBox="0 0 24 24">
+                <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+              </svg>
+              Continuar com Google
+            </button>
+
+            <div className="flex items-center gap-3 my-6">
+              <div className="flex-1 h-px bg-zinc-800" />
+              <span className="text-xs text-zinc-600">seus dados são privados</span>
+              <div className="flex-1 h-px bg-zinc-800" />
+            </div>
+
+            <div className="space-y-2">
+              {[
+                'Sincronizado em tempo real',
+                'Acesso em qualquer dispositivo',
+                'Dados criptografados e seguros',
+              ].map((text) => (
+                <div key={text} className="flex items-center gap-2 text-xs text-zinc-500">
+                  <div className="w-1 h-1 rounded-full bg-emerald-500 flex-shrink-0" />
+                  {text}
                 </div>
               ))}
             </div>
           </div>
-        )}
-        
-        {/* Botões de ação */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-          <Button
-            onClick={handleBackup}
-            disabled={isLoading || !hasLocalData}
-            variant="default"
-            className="flex items-center justify-center"
-          >
-            <Upload className="mr-2 h-4 w-4" />
-            {isLoading ? 'Salvando...' : 'Fazer Backup'}
-          </Button>
-          
-          <Button
-            onClick={handleRestore}
-            disabled={isLoading || availableBackups.length === 0}
-            variant="outline"
-            className="flex items-center justify-center"
-          >
-            <Download className="mr-2 h-4 w-4" />
-            {isLoading ? 'Restaurando...' : 'Restaurar Dados'}
-          </Button>
-          
-          <Button
-            onClick={() => signOut()}
-            variant="secondary"
-            className="flex items-center justify-center"
-          >
-            <LogOut className="mr-2 h-4 w-4" />
-            Logout
-          </Button>
         </div>
-        
-        {/* Botões de controle */}
-        <div className="flex gap-2">
-          <Button
-            onClick={() => loadAvailableBackups(true)}
-            disabled={isLoading}
-            variant="ghost"
-            size="sm"
-            className="text-xs"
-          >
-            🔄 Atualizar Lista
-          </Button>
-          
-          <Button
-            onClick={debugInfo}
-            variant="ghost"
-            size="sm"
-            className="text-xs"
-          >
-            🔍 Debug Info
-          </Button>
-        </div>
-        
-        {/* Informações adicionais */}
-        <div className="text-xs text-muted-foreground space-y-1">
-          <p>💡 <strong>Dica:</strong> Backup automático a cada 5 minutos quando logado</p>
-          <p>🔒 <strong>Segurança:</strong> Dados salvos na pasta privada do app no Drive</p>
-          <p>📱 <strong>Sincronização:</strong> Acesse seus dados de qualquer dispositivo</p>
-          <p>⚠️ <strong>Importante:</strong> Verifique se seu NextAuth está configurado com os escopos corretos do Google Drive</p>
-        </div>
-      </CardContent>
-    </Card>
+      </div>
+    )
+  }
+
+  // Sessão ativa — card compacto
+  return (
+    <div className="space-y-3">
+      {notification && (
+        <Alert className={`border-l-4 ${
+          notification.type === 'error' ? 'border-l-red-500 bg-red-50' : 'border-l-emerald-500 bg-emerald-50'
+        }`}>
+          {notification.type === 'error'
+            ? <AlertCircle className="h-4 w-4 text-red-600" />
+            : <CheckCircle className="h-4 w-4 text-emerald-600" />}
+          <AlertDescription className={notification.type === 'error' ? 'text-red-700' : 'text-emerald-700'}>
+            {notification.message}
+          </AlertDescription>
+        </Alert>
+      )}
+
+      <Card className="w-full">
+        <CardContent className="p-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Image
+                className="rounded-full border-2 border-white shadow-sm"
+                src={session.user?.image || '/default-avatar.png'}
+                alt="Profile"
+                width={36}
+                height={36}
+              />
+              <div>
+                <p className="font-medium text-sm">{session.user?.name}</p>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <p className="text-xs text-muted-foreground">{session.user?.email}</p>
+                  <Badge variant="outline" className="text-emerald-600 text-xs py-0">
+                    Conectado
+                  </Badge>
+                </div>
+              </div>
+            </div>
+            <Button variant="ghost" size="sm" onClick={() => setShowAdvanced(!showAdvanced)}>
+              <Settings className="h-4 w-4" />
+            </Button>
+          </div>
+
+          {showAdvanced && (
+            <div className="mt-4 pt-4 border-t flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium">Desconectar</p>
+                <p className="text-xs text-muted-foreground">Sair da conta Google</p>
+              </div>
+              <Button variant="destructive" size="sm" onClick={() => { api.setToken(null); signOut() }}>
+                <LogOut className="mr-1 h-4 w-4" /> Sair
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
   )
 }

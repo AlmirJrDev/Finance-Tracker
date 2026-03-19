@@ -1,53 +1,25 @@
-import NextAuth from 'next-auth'
 import GoogleProvider from 'next-auth/providers/google'
-import { NextAuthOptions } from 'next-auth'
 
-// Extend the built-in session types
-declare module "next-auth" {
-  interface Session {
-    accessToken?: string
-    refreshToken?: string
-  }
-}
-
-declare module "next-auth/jwt" {
-  interface JWT {
-    accessToken?: string
-    refreshToken?: string
-  }
-}
-
-export const authOptions: NextAuthOptions = {
+export const authOptions = {
   providers: [
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID!,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
-      authorization: {
-        params: {
-          scope: 'openid email profile https://www.googleapis.com/auth/drive.file'
-        }
-      }
-    })
+    }),
   ],
   callbacks: {
-    async jwt({ token, account }) {
+    async jwt({ token, account }: { token: any; account: any }) {
       if (account) {
         token.accessToken = account.access_token
-        token.refreshToken = account.refresh_token
+        token.idToken = account.id_token
       }
       return token
     },
-    async session({ session, token }) {
-      session.accessToken = token.accessToken
-      session.refreshToken = token.refreshToken
+    async session({ session, token }: { session: any; token: any }) {
+      session.accessToken = token.accessToken as string
+      session.idToken = token.idToken as string
       return session
-    }
-    
+    },
   },
-  secret: process.env.AUTH_SECRET,
-
+  secret: process.env.NEXTAUTH_SECRET,
 }
-
-const handler = NextAuth(authOptions)
-
-export { handler as GET, handler as POST }

@@ -7,8 +7,9 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Progress } from '@/components/ui/progress';
 import { AlertCircle, Edit, Trash2, PlusCircle } from 'lucide-react';
-import { loadCategories } from '@/lib/categories';
 import { MonthlyData } from '@/types/finance';
+import api from '@/lib/api';
+
 
 interface CategoryBudget {
   category: string;
@@ -16,6 +17,7 @@ interface CategoryBudget {
 }
 
 const loadBudgetLimits = (): CategoryBudget[] => {
+  if (typeof window === 'undefined') return [];
   const stored = localStorage.getItem('categoryBudgetLimits');
   return stored ? JSON.parse(stored) : [];
 };
@@ -33,33 +35,34 @@ export default function CategoryBudgetManager({ data }: CategoryBudgetManagerPro
   const [budgetLimits, setBudgetLimits] = useState<CategoryBudget[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string>('');
   const [budgetLimit, setBudgetLimit] = useState<string>('');
-  const [availableCategories, setAvailableCategories] = useState<string[]>([]);
+  const [availableCategories, setAvailableCategories] = useState<{ id: string; name: string }[]>([]);
   const [isEditing, setIsEditing] = useState<number | null>(null);
   const [categorySpending, setCategorySpending] = useState<Record<string, number>>({});
 
+  // Carrega categorias da API
   useEffect(() => {
+    api.getCategories()
+      .then((res) => setAvailableCategories(res.data.map((c: any) => ({ id: c._id, name: c.name }))))
+      .catch(() => setAvailableCategories([]));
+
     setBudgetLimits(loadBudgetLimits());
-    setAvailableCategories(loadCategories());
   }, []);
 
+  // Calcula gastos por categoria com base nos dados do mês
   useEffect(() => {
     if (!data) return;
-    
+
     const spending: Record<string, number> = {};
-    
-    data.dailyBalances.forEach(day => {
-      day.dailyTransactions.forEach(transaction => {
+
+    data.dailyBalances.forEach((day) => {
+      day.dailyTransactions.forEach((transaction) => {
         if (transaction.type === 'saída' && transaction.category) {
-          const normalizedCategory = transaction.category.toLowerCase();
-          if (!spending[normalizedCategory]) {
-            spending[normalizedCategory] = 0;
-          }
-          spending[normalizedCategory] += transaction.amount;
+          const key = transaction.category.toLowerCase();
+          spending[key] = (spending[key] || 0) + transaction.amount;
         }
       });
     });
-    
-    console.log('Gastos por categoria calculados:', spending);
+
     setCategorySpending(spending);
   }, [data]);
 
@@ -69,33 +72,20 @@ export default function CategoryBudgetManager({ data }: CategoryBudgetManagerPro
       return;
     }
 
-    const existingIndex = budgetLimits.findIndex(item => item.category === selectedCategory);
-    
+    const existingIndex = budgetLimits.findIndex((item) => item.category === selectedCategory);
     let newLimits: CategoryBudget[];
-    
+
     if (isEditing !== null) {
       newLimits = [...budgetLimits];
-      newLimits[isEditing] = {
-        category: selectedCategory,
-        limit: Number(budgetLimit)
-      };
+      newLimits[isEditing] = { category: selectedCategory, limit: Number(budgetLimit) };
     } else if (existingIndex >= 0) {
-
-      if (!confirm(`Já existe um limite para a categoria "${selectedCategory}". Deseja atualizá-lo?`)) {
-        return;
-      }
+      if (!confirm(`Já existe um limite para "${selectedCategory}". Deseja atualizá-lo?`)) return;
       newLimits = [...budgetLimits];
       newLimits[existingIndex].limit = Number(budgetLimit);
     } else {
-      newLimits = [
-        ...budgetLimits,
-        {
-          category: selectedCategory,
-          limit: Number(budgetLimit)
-        }
-      ];
+      newLimits = [...budgetLimits, { category: selectedCategory, limit: Number(budgetLimit) }];
     }
-    
+
     setBudgetLimits(newLimits);
     saveBudgetLimits(newLimits);
     resetForm();
@@ -110,7 +100,6 @@ export default function CategoryBudgetManager({ data }: CategoryBudgetManagerPro
 
   const handleDelete = (index: number) => {
     const categoryToDelete = budgetLimits[index].category;
-    
     if (confirm(`Tem certeza que deseja remover o limite para "${categoryToDelete}"?`)) {
       const newLimits = budgetLimits.filter((_, i) => i !== index);
       setBudgetLimits(newLimits);
@@ -124,55 +113,40 @@ export default function CategoryBudgetManager({ data }: CategoryBudgetManagerPro
     setIsEditing(null);
   };
 
-  // Filtrar categorias disponíveis para o dropdown (remover as que já têm limites se não estiver em modo edição)
-  const filteredCategories = isEditing !== null 
-    ? availableCategories 
-    : availableCategories.filter(category => 
-        !budgetLimits.some(budget => budget.category === category)
-      );
+  const filteredCategories = isEditing !== null
+    ? availableCategories
+    : availableCategories.filter((cat) => !budgetLimits.some((b) => b.category === cat.name));
 
-  const getProgress = (category: string, limit: number): number => {
-    // Normalizar categoria para comparação
-    const normalizedCategory = category.toLowerCase();
-    const spent = categorySpending[normalizedCategory] || 0;
-    return Math.min((spent / limit) * 100, 100);
-  };
-      
-  const isOverBudget = (category: string, limit: number): boolean => {
-    // Normalizar categoria para comparação
-    const normalizedCategory = category.toLowerCase();
-    const spent = categorySpending[normalizedCategory] || 0;
-    return spent > limit;
-  };
+  const getSpent = (categoryName: string) =>
+    categorySpending[categoryName.toLowerCase()] || 0;
 
-  // Função para obter o valor gasto de uma categoria
-  const getCategorySpent = (category: string): number => {
-    const normalizedCategory = category.toLowerCase();
-    return categorySpending[normalizedCategory] || 0;
-  };
+  const getProgress = (categoryName: string, limit: number) =>
+    Math.min((getSpent(categoryName) / limit) * 100, 100);
+
+  const isOverBudget = (categoryName: string, limit: number) =>
+    getSpent(categoryName) > limit;
 
   return (
     <Card className="w-full mb-6">
       <CardHeader>
         <CardTitle>Limites de Gastos por Categoria</CardTitle>
-        <CardDescription>
-          Defina limites orçamentários para suas categorias de despesas
-        </CardDescription>
+        <CardDescription>Defina limites orçamentários para suas categorias de despesas</CardDescription>
       </CardHeader>
       <CardContent>
         <div className="flex flex-col gap-2 mb-6 md:flex-row">
-          <select 
-            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+          <select
+            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
             value={selectedCategory}
             onChange={(e) => setSelectedCategory(e.target.value)}
           >
             <option value="">Selecione uma categoria</option>
-            {filteredCategories.map((category) => (
-              <option key={category} value={category}>
-                {category}
+            {filteredCategories.map((cat) => (
+              <option key={cat.id} value={cat.name}>
+                {cat.name}
               </option>
             ))}
           </select>
+
           <Input
             type="number"
             placeholder="Valor limite"
@@ -182,83 +156,68 @@ export default function CategoryBudgetManager({ data }: CategoryBudgetManagerPro
             min="0"
             step="0.01"
           />
+
           <Button onClick={handleSaveBudget} className="flex items-center gap-1 whitespace-nowrap">
-            <PlusCircle className="h-4 w-4" /> {isEditing !== null ? 'Atualizar' : 'Adicionar'} Limite
+            <PlusCircle className="h-4 w-4" />
+            {isEditing !== null ? 'Atualizar' : 'Adicionar'} Limite
           </Button>
+
           {isEditing !== null && (
-            <Button variant="outline" onClick={resetForm}>
-              Cancelar
-            </Button>
+            <Button variant="outline" onClick={resetForm}>Cancelar</Button>
           )}
         </div>
 
-  
-          {budgetLimits.length > 0 ? (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Categoria</TableHead>
-                  <TableHead>Limite</TableHead>
-                  <TableHead>Gasto</TableHead>
-                  <TableHead>Progresso</TableHead>
-                  <TableHead className="text-right">Ações</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {budgetLimits.map((budget, index) => {
-                  const spent = getCategorySpent(budget.category);
-                  const progress = getProgress(budget.category, budget.limit);
-                  const overBudget = isOverBudget(budget.category, budget.limit);
-                  
-                  return (
-                    <TableRow key={index}>
-                      <TableCell>{budget.category}</TableCell>
-                      <TableCell>R$ {budget.limit.toFixed(2)}</TableCell>
-                      <TableCell className={overBudget ? "text-red-500 font-bold" : ""}>
-                        R$ {spent.toFixed(2)}
-                        {overBudget && <AlertCircle className="inline ml-2 h-4 w-4" />}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <Progress 
-                            value={progress} 
-                            className={`w-full ${overBudget ? "bg-red-200" : "bg-slate-200"}`}
-                          />
-                          <span className="text-xs whitespace-nowrap">
-                            {progress.toFixed(0)}%
-                          </span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleEdit(index)}
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleDelete(index)}
-                            className="text-red-600"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          ) : (
-            <div className="text-center py-8 text-muted-foreground">
-              Nenhum limite orçamentário definido. Adicione seu primeiro limite acima.
-            </div>
-          )}
-   
+        {budgetLimits.length > 0 ? (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Categoria</TableHead>
+                <TableHead>Limite</TableHead>
+                <TableHead>Gasto</TableHead>
+                <TableHead>Progresso</TableHead>
+                <TableHead className="text-right">Ações</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {budgetLimits.map((budget, index) => {
+                const spent = getSpent(budget.category);
+                const progress = getProgress(budget.category, budget.limit);
+                const over = isOverBudget(budget.category, budget.limit);
+
+                return (
+                  <TableRow key={index}>
+                    <TableCell>{budget.category}</TableCell>
+                    <TableCell>R$ {budget.limit.toFixed(2)}</TableCell>
+                    <TableCell className={over ? 'text-red-500 font-bold' : ''}>
+                      R$ {spent.toFixed(2)}
+                      {over && <AlertCircle className="inline ml-2 h-4 w-4" />}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <Progress value={progress} className={`w-full ${over ? 'bg-red-200' : 'bg-slate-200'}`} />
+                        <span className="text-xs whitespace-nowrap">{progress.toFixed(0)}%</span>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-2">
+                        <Button variant="ghost" size="icon" onClick={() => handleEdit(index)}>
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon" onClick={() => handleDelete(index)} className="text-red-600">
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        ) : (
+          <div className="text-center py-8 text-muted-foreground">
+            Nenhum limite orçamentário definido. Adicione seu primeiro limite acima.
+          </div>
+        )}
       </CardContent>
     </Card>
   );
