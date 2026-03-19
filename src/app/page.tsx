@@ -23,6 +23,7 @@ import { GoogleDriveSync } from '@/components/googleDriveSync';
 import { UserAvatarPopover } from '@/components/ui/user';
 import api from '@/lib/api';
 import { useBackendAuth } from '@/lib/useBackendAuth';
+import AnnualView from '@/components/ui/AnnualView';
 
 
 function toNumber(value: any): number {
@@ -106,7 +107,7 @@ console.log('transactions[0] UTC day:', new Date(transactions[0]?.date).getUTCDa
 export default function HomePage() {
   useBackendAuth()
   const { data: session, status } = useSession();
-
+const [showAnnual, setShowAnnual] = useState(false);
   const [allMonthsData, setAllMonthsData] = useState<MonthlyData[]>([]);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
@@ -317,12 +318,23 @@ console.log('summary raw:', summaryRes.data)
     <Plus className="h-4 w-4" />
     Nova Transação
   </Button>
+  <Button
+  variant="outline"
+  onClick={() => setShowAnnual(!showAnnual)}
+  className="text-sm"
+>
+  {showAnnual ? 'Visão Mensal' : 'Visão Anual'}
+</Button>
 </div>
           </div>
         </CardContent>
       </Card>
 
-      {isLoading ? (
+      {showAnnual ? (
+  <AnnualView />
+) : (
+  <>
+   {isLoading ? (
         <div className="flex justify-center items-center py-20">
           <Loader2 className="animate-spin h-8 w-8 text-muted-foreground" />
         </div>
@@ -372,6 +384,10 @@ console.log('summary raw:', summaryRes.data)
         isOpen={showCategoryManager}
         onClose={() => setShowCategoryManager(false)}
       />
+      </>
+)}
+
+     
     </div>
   );
 }
