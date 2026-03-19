@@ -254,10 +254,10 @@ export default function AnnualView() {
         .day-cell { aspect-ratio: 1; border-radius: 2px; font-size: 8px; font-weight: 500; display: flex; align-items: center; justify-content: center; cursor: default; transition: transform 0.08s; }
         .day-cell:hover { transform: scale(1.4); z-index: 10; position: relative; }
         .day-empty-data { background: hsl(var(--muted)); color: hsl(var(--muted-foreground)); opacity: 0.5; }
-        .day-pos-strong { background: #C0DD97; color: #27500A; }
-        .day-pos-soft { background: #EAF3DE; color: #3B6D11; }
-        .day-neg-strong { background: #F7C1C1; color: #791F1F; }
-        .day-neg-soft { background: #FCEBEB; color: #A32D2D; }
+        .day-pos-strong { background: #8ac03f ; color: #27500A; }
+        .day-pos-soft { background: #bcd996; color: #3B6D11; }
+        .day-neg-strong { background: #d81c1c ; color: #791F1F; }
+        .day-neg-soft { background: #ef9696; color: #A32D2D; }
         .day-neutral { background: hsl(var(--muted)); color: hsl(var(--muted-foreground)); }
         .legend { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
         .legend-item { display: flex; align-items: center; gap: 4px; font-size: 11px; color: hsl(var(--muted-foreground)); }
@@ -312,10 +312,10 @@ export default function AnnualView() {
             </Button>
           </div>
           <div className="legend">
-            <div className="legend-item"><div className="legend-dot" style={{ background: '#C0DD97' }} />Positivo alto</div>
-            <div className="legend-item"><div className="legend-dot" style={{ background: '#EAF3DE' }} />Positivo</div>
-            <div className="legend-item"><div className="legend-dot" style={{ background: '#FCEBEB' }} />Negativo</div>
-            <div className="legend-item"><div className="legend-dot" style={{ background: '#F7C1C1' }} />Negativo alto</div>
+            <div className="legend-item"><div className="legend-dot" style={{ background: '#8ac03f ' }} />Positivo alto</div>
+            <div className="legend-item"><div className="legend-dot" style={{ background: '#bcd996' }} />Positivo</div>
+            <div className="legend-item"><div className="legend-dot" style={{ background: '#ef9696' }} />Negativo</div>
+            <div className="legend-item"><div className="legend-dot" style={{ background: '#d81c1c ' }} />Negativo alto</div>
           </div>
         </div>
 
