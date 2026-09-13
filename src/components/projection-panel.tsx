@@ -93,7 +93,16 @@ function UpcomingRow({ item, today, onPay, paying }: { item: UpcomingItem; today
   );
 }
 
-export function ProjectionPanel({ accountId, accountName }: { accountId?: string; accountName?: string }) {
+export function ProjectionPanel({
+  accountId,
+  accountName,
+  staleSince,
+}: {
+  accountId?: string;
+  accountName?: string;
+  /** Data (dd/mm/aaaa) desde quando os dados estão parados; marca a projeção como pouco confiável */
+  staleSince?: string | null;
+}) {
   const [days, setDays] = useState<number>(90);
   const { data, isLoading, error, isPlaceholderData } = useProjection(days, accountId);
   const month = data?.today.slice(0, 7);
@@ -130,12 +139,21 @@ export function ProjectionPanel({ accountId, accountName }: { accountId?: string
   const hasAlerts = data.overdue.count > 0 || data.firstNegativeDate || budgetAlerts.length > 0;
 
   return (
-    <Card className={`mb-6 ${isPlaceholderData ? 'opacity-70' : ''}`}>
+    <Card id="projecao" className={`mb-6 scroll-mt-4 ${isPlaceholderData ? 'opacity-70' : ''}`}>
       <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <CardTitle>Projeção de saldo{accountName ? ` · ${accountName}` : ''}</CardTitle>
+          <CardTitle className="flex flex-wrap items-center gap-2">
+            Projeção de saldo{accountName ? ` · ${accountName}` : ''}
+            {staleSince !== undefined && (
+              <span className="inline-flex items-center gap-1 rounded-full border border-amber-500/50 px-2 py-0.5 text-xs font-normal text-amber-700 dark:text-amber-300">
+                <AlertTriangle className="h-3 w-3" aria-hidden /> Pouco confiável
+              </span>
+            )}
+          </CardTitle>
           <CardDescription>
-            Considera transações pendentes e recorrências ativas, mesmo as que ainda não foram geradas.
+            {staleSince !== undefined
+              ? `Sem lançamentos${staleSince ? ` desde ${staleSince}` : ''}: a projeção considera só o que está cadastrado, sem os gastos do dia a dia.`
+              : 'Considera transações pendentes e recorrências ativas, mesmo as que ainda não foram geradas.'}
           </CardDescription>
         </div>
         <div className="flex gap-1" role="group" aria-label="Período da projeção">

@@ -18,12 +18,17 @@ export const queryKeys = {
   activeMonths: (accountId?: string) => ['summary', 'months', accountId ?? 'all'] as const,
   projection: (days: number, accountId?: string) => ['summary', 'projection', days, accountId ?? 'all'] as const,
   budgets: (month: string) => ['summary', 'budgets', month] as const,
+  freshness: ['summary', 'freshness'] as const,
 };
 
 // ─── Leitura ──────────────────────────────────────────────────────────────────
 
 export function useCategories() {
   return useQuery({ queryKey: queryKeys.categories, queryFn: api.categories.list, staleTime: 5 * 60_000 });
+}
+
+export function useFreshness() {
+  return useQuery({ queryKey: queryKeys.freshness, queryFn: api.summary.freshness, staleTime: 5 * 60_000 });
 }
 
 export function useAccounts() {

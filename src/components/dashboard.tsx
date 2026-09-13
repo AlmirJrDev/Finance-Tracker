@@ -22,8 +22,18 @@ import { UserAvatarPopover } from '@/components/ui/user';
 import { DeleteTransactionDialog } from '@/components/forms/delete-transaction-dialog';
 import { ProjectionPanel } from '@/components/projection-panel';
 import { AccountsManager } from '@/components/accounts-manager';
+import { StaleDataBanner } from '@/components/stale-data-banner';
 import { AccountSelect } from '@/components/forms/account-select';
-import { useAccounts, useActiveMonths, useMonthSummary, useMonthTransactions, useSetTransactionStatus } from '@/hooks/use-finance';
+import {
+  useAccounts,
+  useActiveMonths,
+  useFreshness,
+  useMonthSummary,
+  useMonthTransactions,
+  useProjection,
+  useSetTransactionStatus,
+} from '@/hooks/use-finance';
+import { formatDate } from '@/lib/dates';
 import { defaultAccount } from '@/lib/accounts';
 import { currentMonthStr, monthLabel } from '@/lib/dates';
 import type { Transaction } from '@/types/finance';
@@ -43,6 +53,11 @@ export function Dashboard() {
   const [accountId, setAccountId] = useState<string | undefined>();
 
   const accounts = useAccounts();
+  const freshness = useFreshness();
+  // Mesma consulta do painel de projeção (compartilha o cache): quantas ficaram a confirmar
+  const overallProjection = useProjection(90);
+  const stale = freshness.data?.stale ? freshness.data : null;
+  const staleSince = stale?.lastActivityAt ? formatDate(stale.lastActivityAt.slice(0, 10)) : null;
   const summary = useMonthSummary(month, accountId);
   const transactions = useMonthTransactions(month, accountId);
   const activeMonths = useActiveMonths(accountId);
@@ -95,6 +110,19 @@ export function Dashboard() {
           <UserAvatarPopover />
         </div>
       </div>
+
+      {stale && (
+        <StaleDataBanner
+          freshness={stale}
+          overdueCount={overallProjection.data?.overdue.count ?? 0}
+          onAdjustBalances={() => setAccountsOpen(true)}
+          onReviewPending={() => {
+            setView('month');
+            setAccountId(undefined);
+            requestAnimationFrame(() => document.getElementById('projecao')?.scrollIntoView({ behavior: 'smooth' }));
+          }}
+        />
+      )}
 
       <Card className="w-full mb-4">
         <CardContent className="p-4">
@@ -171,7 +199,7 @@ export function Dashboard() {
           </div>
         ) : (
           <div className={summary.isPlaceholderData || transactions.isPlaceholderData ? 'opacity-60 transition-opacity' : ''}>
-            <ProjectionPanel accountId={accountId} accountName={selectedAccount?.name} />
+            <ProjectionPanel accountId={accountId} accountName={selectedAccount?.name} staleSince={stale ? staleSince : undefined} />
             <MonthlySummary summary={summary.data} />
             {isEmpty ? (
               <Card className="text-center p-8 rounded-md flex flex-col justify-center items-center gap-4 mb-6">

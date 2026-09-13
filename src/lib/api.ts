@@ -3,6 +3,7 @@ import type {
   AccountType,
   TransferInput,
   ActiveMonth,
+  Freshness,
   BudgetStatus,
   Category,
   InstallmentInput,
@@ -160,6 +161,7 @@ export const api = {
       request<MonthSummary>(`/api/summary/month/${month}`, { query: { accountId } }),
     year: (year: number, accountId?: string) => request<YearSummary>(`/api/summary/year/${year}`, { query: { accountId } }),
     months: (accountId?: string) => request<ActiveMonth[]>('/api/summary/months', { query: { accountId } }),
+    freshness: () => request<Freshness>('/api/summary/freshness'),
     projection: (days: number, accountId?: string) =>
       request<Projection>('/api/summary/projection', { query: { days, accountId } }),
   },

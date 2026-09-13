@@ -200,6 +200,16 @@ export interface Projection {
   points: { date: string; balanceCents: number }[];
 }
 
+export interface Freshness {
+  hasData: boolean;
+  lastActivityAt: string | null;
+  lastManualEntryDate: string | null;
+  daysSinceActivity: number | null;
+  staleAfterDays: number;
+  /** Usuário sem alterar dados há staleAfterDays dias ou mais */
+  stale: boolean;
+}
+
 export type BudgetLevel = 'ok' | 'warning' | 'exceeded';
 
 export interface BudgetStatus {
