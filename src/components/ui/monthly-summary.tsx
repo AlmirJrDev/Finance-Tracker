@@ -61,7 +61,14 @@ export function MonthlySummary({ summary }: { summary: MonthSummary }) {
         description={resultLabel}
         cents={summary.finalBalanceCents}
         tone="balance"
-        footnote={hasPending ? `${formatCents(summary.paidFinalBalanceCents)} considerando só o que foi pago` : undefined}
+        footnote={[
+          hasPending ? `${formatCents(summary.paidFinalBalanceCents)} considerando só o que foi pago` : null,
+          summary.otherMovementsCents !== 0
+            ? `inclui ${summary.otherMovementsCents > 0 ? '+' : ''}${formatCents(summary.otherMovementsCents)} em transferências e ajustes`
+            : null,
+        ]
+          .filter(Boolean)
+          .join(' · ') || undefined}
       />
     </div>
   );

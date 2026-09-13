@@ -80,13 +80,15 @@ function MonthCard({
 export default function AnnualView({
   initialYear,
   onSelectMonth,
+  accountId,
 }: {
   initialYear: number;
   onSelectMonth: (month: string) => void;
+  accountId?: string;
 }) {
   const [year, setYear] = useState(initialYear);
   const [tooltip, setTooltip] = useState<Tooltip>(null);
-  const { data, isLoading, isPlaceholderData, error } = useYearSummary(year);
+  const { data, isLoading, isPlaceholderData, error } = useYearSummary(year, accountId);
 
   return (
     <>

@@ -21,7 +21,10 @@ import { TutorialGuide } from '@/components/ui/tutorialGuide';
 import { UserAvatarPopover } from '@/components/ui/user';
 import { DeleteTransactionDialog } from '@/components/forms/delete-transaction-dialog';
 import { ProjectionPanel } from '@/components/projection-panel';
-import { useActiveMonths, useMonthSummary, useMonthTransactions, useSetTransactionStatus } from '@/hooks/use-finance';
+import { AccountsManager } from '@/components/accounts-manager';
+import { AccountSelect } from '@/components/forms/account-select';
+import { useAccounts, useActiveMonths, useMonthSummary, useMonthTransactions, useSetTransactionStatus } from '@/hooks/use-finance';
+import { defaultAccount } from '@/lib/accounts';
 import { currentMonthStr, monthLabel } from '@/lib/dates';
 import type { Transaction } from '@/types/finance';
 
@@ -35,10 +38,16 @@ export function Dashboard() {
   const [categoriesOpen, setCategoriesOpen] = useState(false);
 
   const [deleting, setDeleting] = useState<Transaction | null>(null);
+  const [accountsOpen, setAccountsOpen] = useState(false);
+  // undefined = todas as contas
+  const [accountId, setAccountId] = useState<string | undefined>();
 
-  const summary = useMonthSummary(month);
-  const transactions = useMonthTransactions(month);
-  const activeMonths = useActiveMonths();
+  const accounts = useAccounts();
+  const summary = useMonthSummary(month, accountId);
+  const transactions = useMonthTransactions(month, accountId);
+  const activeMonths = useActiveMonths(accountId);
+  const selectedAccount = accounts.data?.find((a) => a.id === accountId);
+  const suggestedAccountId = accountId ?? defaultAccount(accounts.data)?.id;
   const setStatus = useSetTransactionStatus();
 
   // Se o mês atual está vazio, abre no mês mais recente com movimento (uma única vez)
@@ -91,11 +100,17 @@ export function Dashboard() {
         <CardContent className="p-4">
           <div className="flex flex-col xl:flex-row xl:justify-between xl:items-center gap-4">
             <div className="flex justify-center xl:justify-start">
-              {view !== 'annual' && (
-                <MonthSelector month={month} onChange={setMonth} activeMonths={activeMonths.data ?? []} />
-              )}
+              <div className="flex flex-col items-center gap-2 sm:flex-row">
+                <AccountSelect value={accountId} onChange={setAccountId} allowAll className="w-52" />
+                {view !== 'annual' && (
+                  <MonthSelector month={month} onChange={setMonth} activeMonths={activeMonths.data ?? []} />
+                )}
+              </div>
             </div>
             <div className="flex flex-col sm:flex-row sm:flex-wrap sm:justify-center xl:justify-end gap-2">
+              <Button variant="outline" onClick={() => setAccountsOpen(true)} className="text-sm">
+                Contas
+              </Button>
               <Button variant="outline" onClick={() => setCategoriesOpen(true)} className="text-sm">
                 Categorias
               </Button>
@@ -124,6 +139,7 @@ export function Dashboard() {
 
       {view === 'annual' && (
         <AnnualView
+          accountId={accountId}
           initialYear={Number(month.slice(0, 4))}
           onSelectMonth={(m) => {
             setMonth(m);
@@ -132,7 +148,7 @@ export function Dashboard() {
         />
       )}
 
-      {view === 'recurring' && <RecurringTransactions month={month} />}
+      {view === 'recurring' && <RecurringTransactions month={month} defaultAccountId={suggestedAccountId} />}
 
       {view === 'month' &&
         (loadError ? (
@@ -155,7 +171,7 @@ export function Dashboard() {
           </div>
         ) : (
           <div className={summary.isPlaceholderData || transactions.isPlaceholderData ? 'opacity-60 transition-opacity' : ''}>
-            <ProjectionPanel />
+            <ProjectionPanel accountId={accountId} accountName={selectedAccount?.name} />
             <MonthlySummary summary={summary.data} />
             {isEmpty ? (
               <Card className="text-center p-8 rounded-md flex flex-col justify-center items-center gap-4 mb-6">
@@ -168,7 +184,7 @@ export function Dashboard() {
             ) : (
               <>
                 <CategoryCharts summary={summary.data} />
-                <CategoryBudgetManager month={month} />
+                {!accountId && <CategoryBudgetManager month={month} />}
                 <DailyAllowance key={`${month}:${summary.data.resultCents}`} summary={summary.data} />
                 <RecurringExpenseTracker key={month} month={month} />
               </>
@@ -179,6 +195,7 @@ export function Dashboard() {
               onEdit={openEdit}
               onDelete={setDeleting}
               onToggleStatus={handleToggleStatus}
+              showAccount={!accountId}
             />
           </div>
         ))}
@@ -191,6 +208,7 @@ export function Dashboard() {
         }}
         transaction={editing}
         month={month}
+        defaultAccountId={suggestedAccountId}
         onSaved={(saved) => {
           // Leva o usuário ao mês da transação salva
           const savedMonth = saved.date.slice(0, 7);
@@ -201,6 +219,7 @@ export function Dashboard() {
       <DeleteTransactionDialog transaction={deleting} onClose={() => setDeleting(null)} />
 
       <CategoryManager open={categoriesOpen} onOpenChange={setCategoriesOpen} />
+      <AccountsManager open={accountsOpen} onOpenChange={setAccountsOpen} />
     </div>
   );
 }

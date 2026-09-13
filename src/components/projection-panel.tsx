@@ -93,12 +93,12 @@ function UpcomingRow({ item, today, onPay, paying }: { item: UpcomingItem; today
   );
 }
 
-export function ProjectionPanel() {
+export function ProjectionPanel({ accountId, accountName }: { accountId?: string; accountName?: string }) {
   const [days, setDays] = useState<number>(90);
-  const { data, isLoading, error, isPlaceholderData } = useProjection(days);
+  const { data, isLoading, error, isPlaceholderData } = useProjection(days, accountId);
   const month = data?.today.slice(0, 7);
   const budgets = useBudgets(month ?? '');
-  const overdue = useOverdueTransactions(data?.today ?? '', Boolean(data && data.overdue.count > 0));
+  const overdue = useOverdueTransactions(data?.today ?? '', Boolean(data && data.overdue.count > 0), accountId);
   const setStatus = useSetTransactionStatus();
 
   if (error) {
@@ -124,7 +124,8 @@ export function ProjectionPanel() {
     }
   };
 
-  const budgetAlerts = (month ? budgets.data : undefined)?.filter((b) => b.level !== 'ok') ?? [];
+  // Orçamentos valem para todas as contas; só aparecem na visão geral
+  const budgetAlerts = (month && !accountId ? budgets.data : undefined)?.filter((b) => b.level !== 'ok') ?? [];
   const endDate = data.points.at(-1)!.date;
   const hasAlerts = data.overdue.count > 0 || data.firstNegativeDate || budgetAlerts.length > 0;
 
@@ -132,7 +133,7 @@ export function ProjectionPanel() {
     <Card className={`mb-6 ${isPlaceholderData ? 'opacity-70' : ''}`}>
       <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <CardTitle>Projeção de saldo</CardTitle>
+          <CardTitle>Projeção de saldo{accountName ? ` · ${accountName}` : ''}</CardTitle>
           <CardDescription>
             Considera transações pendentes e recorrências ativas, mesmo as que ainda não foram geradas.
           </CardDescription>

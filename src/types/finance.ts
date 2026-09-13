@@ -3,6 +3,35 @@
 
 export type TransactionType = 'income' | 'expense';
 export type TransactionStatus = 'paid' | 'pending';
+/** regular = receita/despesa; transfer = entre contas; adjustment = ajuste de saldo */
+export type TransactionKind = 'regular' | 'transfer' | 'adjustment';
+export type AccountType = 'checking' | 'savings' | 'credit_card' | 'cash' | 'investment' | 'other';
+
+export interface Account {
+  id: string;
+  name: string;
+  type: AccountType;
+  color: string;
+  icon: string | null;
+  isDefault: boolean;
+  isArchived: boolean;
+  provider: { name: string; connectorName: string | null; importFrom: string | null; lastSyncAt: string | null } | null;
+  /** Pago até hoje */
+  balanceCents: number;
+  /** Previsto até o fim do mês atual (inclui pendentes) */
+  projectedBalanceCents: number;
+  transactionCount: number;
+}
+
+export interface TransferInput {
+  fromAccountId: string;
+  toAccountId: string;
+  amountCents: number;
+  date: string;
+  description?: string;
+  note?: string | null;
+  status?: TransactionStatus;
+}
 export type Frequency = 'daily' | 'weekly' | 'monthly';
 
 export interface Category {
@@ -27,6 +56,10 @@ export interface Transaction {
   amountCents: number;
   type: TransactionType;
   status: TransactionStatus;
+  kind: TransactionKind;
+  accountId: string;
+  transferId: string | null;
+  source: 'manual' | 'pluggy';
   categoryId: string | null;
   category: Category | null;
   note: string | null;
@@ -43,6 +76,7 @@ export interface TransactionInput {
   type: TransactionType;
   status?: TransactionStatus;
   categoryId?: string | null;
+  accountId?: string;
   note?: string | null;
 }
 
@@ -53,6 +87,7 @@ export interface InstallmentInput {
   installments: number;
   type: TransactionType;
   categoryId?: string | null;
+  accountId?: string;
   note?: string | null;
 }
 
@@ -63,6 +98,7 @@ export interface RecurringTransaction {
   type: TransactionType;
   categoryId: string | null;
   category: Category | null;
+  accountId: string | null;
   frequency: Frequency;
   dayOfMonth: number | null;
   dayOfWeek: number | null;
@@ -79,6 +115,8 @@ export interface DaySummary {
   date: string;
   incomeCents: number;
   expenseCents: number;
+  /** Efeito líquido do dia no saldo (inclui transferências e ajustes) */
+  netCents: number;
   balanceCents: number;
   transactionCount: number;
   pendingCount: number;
@@ -96,6 +134,8 @@ export interface MonthTotals {
   pendingIncomeCents: number;
   pendingExpenseCents: number;
   paidFinalBalanceCents: number;
+  /** Transferências e ajustes: mudam o saldo, mas não são receita/despesa */
+  otherMovementsCents: number;
   transactionCount: number;
   pendingCount: number;
   days: DaySummary[];
@@ -139,6 +179,7 @@ export interface UpcomingItem {
   type: TransactionType;
   status: TransactionStatus;
   categoryId: string | null;
+  accountId: string | null;
   category: Category | null;
   recurringId: string | null;
   installment?: Installment | null;

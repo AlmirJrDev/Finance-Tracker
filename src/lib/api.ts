@@ -1,4 +1,7 @@
 import type {
+  Account,
+  AccountType,
+  TransferInput,
   ActiveMonth,
   BudgetStatus,
   Category,
@@ -79,6 +82,7 @@ export type TransactionFilters = {
   type?: TransactionType;
   status?: TransactionStatus;
   categoryId?: string;
+  accountId?: string;
   q?: string;
   sort?: 'asc' | 'desc';
   page?: number;
@@ -101,6 +105,20 @@ export const api = {
         method: 'DELETE',
         query: { onlyPending },
       }),
+  },
+
+  accounts: {
+    list: () => request<Account[]>('/api/accounts'),
+    create: (input: { name: string; type: AccountType; color?: string }) =>
+      request<Account>('/api/accounts', { method: 'POST', body: input }),
+    update: (id: string, input: Partial<{ name: string; type: AccountType; color: string; isArchived: boolean; isDefault: true }>) =>
+      request<Account>(`/api/accounts/${id}`, { method: 'PUT', body: input }),
+    remove: (id: string, moveTo?: string) =>
+      request<{ movedCount: number }>(`/api/accounts/${id}`, { method: 'DELETE', query: { moveTo } }),
+    adjust: (id: string, input: { balanceCents: number; date?: string }) =>
+      request<Transaction | null>(`/api/accounts/${id}/adjust`, { method: 'POST', body: input }),
+    transfer: (input: TransferInput) =>
+      request<{ transferId: string; from: Transaction; to: Transaction }>('/api/accounts/transfers', { method: 'POST', body: input }),
   },
 
   budgets: {
@@ -138,9 +156,11 @@ export const api = {
   },
 
   summary: {
-    month: (month: string) => request<MonthSummary>(`/api/summary/month/${month}`),
-    year: (year: number) => request<YearSummary>(`/api/summary/year/${year}`),
-    months: () => request<ActiveMonth[]>('/api/summary/months'),
-    projection: (days: number) => request<Projection>('/api/summary/projection', { query: { days } }),
+    month: (month: string, accountId?: string) =>
+      request<MonthSummary>(`/api/summary/month/${month}`, { query: { accountId } }),
+    year: (year: number, accountId?: string) => request<YearSummary>(`/api/summary/year/${year}`, { query: { accountId } }),
+    months: (accountId?: string) => request<ActiveMonth[]>('/api/summary/months', { query: { accountId } }),
+    projection: (days: number, accountId?: string) =>
+      request<Projection>('/api/summary/projection', { query: { days, accountId } }),
   },
 };

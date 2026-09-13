@@ -3,18 +3,20 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { addDays } from '@/lib/dates';
-import type { InstallmentInput, RecurringInput, TransactionInput, TransactionStatus } from '@/types/finance';
+import type { AccountType, InstallmentInput, RecurringInput, TransactionInput, TransactionStatus, TransferInput } from '@/types/finance';
 
 // Tudo que depende de saldo fica sob ['summary'] para ser invalidado junto
+// accountId undefined = todas as contas
 export const queryKeys = {
   categories: ['categories'] as const,
   recurring: ['recurring'] as const,
-  transactions: (month: string) => ['transactions', month] as const,
-  overdue: (today: string) => ['transactions', 'overdue', today] as const,
-  monthSummary: (month: string) => ['summary', 'month', month] as const,
-  yearSummary: (year: number) => ['summary', 'year', year] as const,
-  activeMonths: ['summary', 'months'] as const,
-  projection: (days: number) => ['summary', 'projection', days] as const,
+  accounts: ['summary', 'accounts'] as const,
+  transactions: (month: string, accountId?: string) => ['transactions', month, accountId ?? 'all'] as const,
+  overdue: (today: string, accountId?: string) => ['transactions', 'overdue', today, accountId ?? 'all'] as const,
+  monthSummary: (month: string, accountId?: string) => ['summary', 'month', month, accountId ?? 'all'] as const,
+  yearSummary: (year: number, accountId?: string) => ['summary', 'year', year, accountId ?? 'all'] as const,
+  activeMonths: (accountId?: string) => ['summary', 'months', accountId ?? 'all'] as const,
+  projection: (days: number, accountId?: string) => ['summary', 'projection', days, accountId ?? 'all'] as const,
   budgets: (month: string) => ['summary', 'budgets', month] as const,
 };
 
@@ -24,40 +26,48 @@ export function useCategories() {
   return useQuery({ queryKey: queryKeys.categories, queryFn: api.categories.list, staleTime: 5 * 60_000 });
 }
 
-export function useMonthSummary(month: string) {
+export function useAccounts() {
+  return useQuery({ queryKey: queryKeys.accounts, queryFn: api.accounts.list });
+}
+
+export function useMonthSummary(month: string, accountId?: string) {
   return useQuery({
-    queryKey: queryKeys.monthSummary(month),
-    queryFn: () => api.summary.month(month),
+    queryKey: queryKeys.monthSummary(month, accountId),
+    queryFn: () => api.summary.month(month, accountId),
     placeholderData: keepPreviousData,
   });
 }
 
-export function useMonthTransactions(month: string) {
+export function useMonthTransactions(month: string, accountId?: string) {
   return useQuery({
-    queryKey: queryKeys.transactions(month),
-    queryFn: () => api.transactions.list({ month, sort: 'asc', limit: 500 }),
+    queryKey: queryKeys.transactions(month, accountId),
+    queryFn: () => api.transactions.list({ month, accountId, sort: 'asc', limit: 500 }),
     placeholderData: keepPreviousData,
   });
 }
 
-export function useYearSummary(year: number) {
+export function useYearSummary(year: number, accountId?: string) {
   return useQuery({
-    queryKey: queryKeys.yearSummary(year),
-    queryFn: () => api.summary.year(year),
+    queryKey: queryKeys.yearSummary(year, accountId),
+    queryFn: () => api.summary.year(year, accountId),
     placeholderData: keepPreviousData,
   });
 }
 
-export function useActiveMonths() {
-  return useQuery({ queryKey: queryKeys.activeMonths, queryFn: api.summary.months });
+export function useActiveMonths(accountId?: string) {
+  return useQuery({ queryKey: queryKeys.activeMonths(accountId), queryFn: () => api.summary.months(accountId) });
 }
 
 export function useRecurring() {
   return useQuery({ queryKey: queryKeys.recurring, queryFn: api.recurring.list });
 }
 
-export function useProjection(days = 90) {
-  return useQuery({ queryKey: queryKeys.projection(days), queryFn: () => api.summary.projection(days) });
+export function useProjection(days = 90, accountId?: string) {
+  return useQuery({
+    queryKey: queryKeys.projection(days, accountId),
+    queryFn: () => api.summary.projection(days, accountId),
+    placeholderData: keepPreviousData,
+  });
 }
 
 export function useBudgets(month: string) {
@@ -69,10 +79,10 @@ export function useBudgets(month: string) {
 }
 
 /** Pendentes com data anterior a hoje. */
-export function useOverdueTransactions(today: string, enabled: boolean) {
+export function useOverdueTransactions(today: string, enabled: boolean, accountId?: string) {
   return useQuery({
-    queryKey: queryKeys.overdue(today),
-    queryFn: () => api.transactions.list({ status: 'pending', to: addDays(today, -1), sort: 'asc', limit: 500 }),
+    queryKey: queryKeys.overdue(today, accountId),
+    queryFn: () => api.transactions.list({ status: 'pending', to: addDays(today, -1), accountId, sort: 'asc', limit: 500 }),
     enabled,
   });
 }
@@ -181,5 +191,35 @@ export function useRecurringMutations() {
     }),
     remove: useMutation({ mutationFn: api.recurring.remove, onSuccess: refresh }),
     apply: useMutation({ mutationFn: api.recurring.apply, onSuccess: invalidate }),
+  };
+}
+
+export function useAccountMutations() {
+  const qc = useQueryClient();
+  const invalidate = useInvalidateMoney();
+  const refresh = async () => {
+    await qc.invalidateQueries({ queryKey: ['recurring'] });
+    await invalidate();
+  };
+  return {
+    create: useMutation({
+      mutationFn: (input: { name: string; type: AccountType; color?: string }) => api.accounts.create(input),
+      onSuccess: refresh,
+    }),
+    update: useMutation({
+      mutationFn: ({ id, ...input }: { id: string } & Partial<{ name: string; type: AccountType; color: string; isArchived: boolean; isDefault: true }>) =>
+        api.accounts.update(id, input),
+      onSuccess: refresh,
+    }),
+    remove: useMutation({
+      mutationFn: ({ id, moveTo }: { id: string; moveTo?: string }) => api.accounts.remove(id, moveTo),
+      onSuccess: refresh,
+    }),
+    adjust: useMutation({
+      mutationFn: ({ id, balanceCents, date }: { id: string; balanceCents: number; date?: string }) =>
+        api.accounts.adjust(id, { balanceCents, date }),
+      onSuccess: refresh,
+    }),
+    transfer: useMutation({ mutationFn: (input: TransferInput) => api.accounts.transfer(input), onSuccess: refresh }),
   };
 }

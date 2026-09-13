@@ -21,7 +21,8 @@ import {
 } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { CategorySelect } from '@/components/forms/category-select';
-import { useInstallmentMutations, useSaveTransaction } from '@/hooks/use-finance';
+import { AccountSelect } from '@/components/forms/account-select';
+import { useAccountMutations, useInstallmentMutations, useSaveTransaction } from '@/hooks/use-finance';
 import { ApiError } from '@/lib/api';
 import { centsToInput, formatCents, parseAmountToCents } from '@/lib/money';
 import { addMonthsToDate, currentMonthStr, formatDate, todayStr } from '@/lib/dates';
@@ -32,9 +33,11 @@ export const MAX_INSTALLMENTS = 72;
 
 const schema = z
   .object({
-    type: z.enum(['income', 'expense']),
+    type: z.enum(['income', 'expense', 'transfer']),
+    accountId: z.string().optional(),
+    toAccountId: z.string().optional(),
     date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Informe a data'),
-    description: z.string().trim().min(2, 'Mínimo de 2 caracteres').max(200),
+    description: z.string().trim().max(200),
     amount: z
       .string()
       .refine((v) => (parseAmountToCents(v) ?? 0) > 0, 'Informe um valor maior que zero (ex.: 49,90)'),
@@ -47,6 +50,15 @@ const schema = z
     installments: z.string(),
   })
   .superRefine((v, ctx) => {
+    // Em transferências a descrição é opcional (a API gera "Transferência para ...")
+    if (v.type !== 'transfer' && v.description.length < 2) {
+      ctx.addIssue({ code: 'custom', path: ['description'], message: 'Mínimo de 2 caracteres' });
+    }
+    if (v.type === 'transfer') {
+      if (!v.accountId) ctx.addIssue({ code: 'custom', path: ['accountId'], message: 'Escolha a conta de origem' });
+      if (!v.toAccountId) ctx.addIssue({ code: 'custom', path: ['toAccountId'], message: 'Escolha a conta de destino' });
+      return;
+    }
     if (!v.parcelado) return;
     const n = Number(v.installments);
     if (!Number.isInteger(n) || n < 2 || n > MAX_INSTALLMENTS) {
@@ -62,13 +74,17 @@ type Props = {
   transaction: Transaction | null;
   /** Mês em exibição; define a data sugerida para novas transações. */
   month: string;
+  /** Conta sugerida para novas transações (a filtrada no painel ou a padrão) */
+  defaultAccountId?: string;
   onSaved?: (transaction: Transaction) => void;
 };
 
-function defaults(transaction: Transaction | null, month: string): FormValues {
+function defaults(transaction: Transaction | null, month: string, defaultAccountId?: string): FormValues {
   if (transaction) {
     return {
-      type: transaction.type,
+      type: transaction.kind === 'transfer' ? 'transfer' : transaction.type,
+      accountId: transaction.accountId,
+      toAccountId: undefined,
       date: transaction.date,
       description: transaction.description,
       amount: centsToInput(transaction.amountCents),
@@ -85,6 +101,8 @@ function defaults(transaction: Transaction | null, month: string): FormValues {
   const date = month === currentMonthStr() ? today : `${month}-01`;
   return {
     type: 'expense',
+    accountId: defaultAccountId,
+    toAccountId: undefined,
     date,
     description: '',
     amount: '',
@@ -104,32 +122,73 @@ function installmentPreview(totalCents: number, n: number, firstDate: string) {
   return { base, first, lastDate: addMonthsToDate(firstDate, n - 1) };
 }
 
-export default function TransactionForm({ open, onOpenChange, transaction, month, onSaved }: Props) {
+export default function TransactionForm({ open, onOpenChange, transaction, month, defaultAccountId, onSaved }: Props) {
   const save = useSaveTransaction();
   const installments = useInstallmentMutations();
-  const form = useForm<FormValues>({ resolver: zodResolver(schema), defaultValues: defaults(transaction, month) });
+  const { transfer } = useAccountMutations();
+  const form = useForm<FormValues>({ resolver: zodResolver(schema), defaultValues: defaults(transaction, month, defaultAccountId) });
   const { register, control, handleSubmit, reset, setError, setValue, getValues, formState } = form;
-  const [type, parcelado, amount, count, date] = useWatch({
+  const [type, parcelado, amount, count, date, fromAccount, toAccount] = useWatch({
     control,
-    name: ['type', 'parcelado', 'amount', 'installments', 'date'],
+    name: ['type', 'parcelado', 'amount', 'installments', 'date', 'accountId', 'toAccountId'],
   });
+  const isTransfer = type === 'transfer';
+  const isAdjustment = transaction?.kind === 'adjustment';
+  const editingTransfer = transaction?.kind === 'transfer';
 
   useEffect(() => {
-    if (open) reset(defaults(transaction, month));
-  }, [open, transaction, month, reset]);
+    if (open) reset(defaults(transaction, month, defaultAccountId));
+  }, [open, transaction, month, defaultAccountId, reset]);
 
   const totalCents = parseAmountToCents(amount) ?? 0;
   const n = Number(count);
   const preview = parcelado && totalCents >= n && n >= 2 && n <= MAX_INSTALLMENTS ? installmentPreview(totalCents, n, date) : null;
-  const isPending = save.isPending || installments.create.isPending;
+  const isPending = save.isPending || installments.create.isPending || transfer.isPending;
 
   const onSubmit = handleSubmit(async (values) => {
     try {
+      const status = values.paid ? ('paid' as const) : ('pending' as const);
+
+      if (values.type === 'transfer') {
+        if (transaction) {
+          // Editar uma perna: a API aplica valor, data, descrição e status nas duas
+          const saved = await save.mutateAsync({
+            id: transaction.id,
+            input: {
+              type: transaction.type,
+              date: values.date,
+              description: values.description,
+              amountCents: parseAmountToCents(values.amount)!,
+              note: values.note.trim() || null,
+              status,
+            },
+          });
+          toast.success('Transferência atualizada', { description: saved.description });
+          onSaved?.(saved);
+        } else {
+          const created = await transfer.mutateAsync({
+            fromAccountId: values.accountId!,
+            toAccountId: values.toAccountId!,
+            amountCents: parseAmountToCents(values.amount)!,
+            date: values.date,
+            description: values.description.trim() || undefined,
+            note: values.note.trim() || null,
+            status,
+          });
+          playNotificationSound();
+          toast.success('Transferência registrada');
+          onSaved?.(created.from);
+        }
+        onOpenChange(false);
+        return;
+      }
+
       const base = {
         type: values.type,
         date: values.date,
         description: values.description,
-        categoryId: values.categoryId,
+        categoryId: isAdjustment ? null : values.categoryId,
+        accountId: values.accountId,
         note: values.note.trim() || null,
       };
 
@@ -148,7 +207,7 @@ export default function TransactionForm({ open, onOpenChange, transaction, month
           input: {
             ...base,
             amountCents: parseAmountToCents(values.amount)!,
-            status: values.paid ? 'paid' : 'pending',
+            status,
           },
         });
         playNotificationSound();
@@ -200,13 +259,14 @@ export default function TransactionForm({ open, onOpenChange, transaction, month
                 control={control}
                 name="type"
                 render={({ field }) => (
-                  <Select value={field.value} onValueChange={field.onChange}>
+                  <Select value={field.value} onValueChange={field.onChange} disabled={editingTransfer}>
                     <SelectTrigger id="type" className="w-full">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="income">Entrada</SelectItem>
                       <SelectItem value="expense">Saída</SelectItem>
+                      {(!transaction || editingTransfer) && <SelectItem value="transfer">Transferência</SelectItem>}
                     </SelectContent>
                   </Select>
                 )}
@@ -220,9 +280,54 @@ export default function TransactionForm({ open, onOpenChange, transaction, month
             </div>
           </div>
 
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="accountId">{isTransfer ? 'De' : 'Conta'}</Label>
+              <Controller
+                control={control}
+                name="accountId"
+                render={({ field }) => (
+                  <AccountSelect
+                    id="accountId"
+                    value={field.value}
+                    onChange={field.onChange}
+                    exclude={isTransfer ? toAccount : undefined}
+                    disabled={editingTransfer}
+                  />
+                )}
+              />
+              {fieldError('accountId')}
+            </div>
+            {isTransfer && !editingTransfer && (
+              <div className="space-y-2">
+                <Label htmlFor="toAccountId">Para</Label>
+                <Controller
+                  control={control}
+                  name="toAccountId"
+                  render={({ field }) => <AccountSelect id="toAccountId" value={field.value} onChange={field.onChange} exclude={fromAccount} />}
+                />
+                {fieldError('toAccountId')}
+              </div>
+            )}
+            {!isTransfer && !isAdjustment && (
+              <div className="space-y-2">
+                <Label htmlFor="categoryId">Categoria</Label>
+                <Controller
+                  control={control}
+                  name="categoryId"
+                  render={({ field }) => <CategorySelect id="categoryId" value={field.value} onChange={field.onChange} />}
+                />
+              </div>
+            )}
+          </div>
+
           <div className="space-y-2">
-            <Label htmlFor="description">Descrição</Label>
-            <Input id="description" placeholder="Ex: Salário, Conta de luz, etc." {...register('description')} />
+            <Label htmlFor="description">{isTransfer && !transaction ? 'Descrição (opcional)' : 'Descrição'}</Label>
+            <Input
+              id="description"
+              placeholder={isTransfer ? 'Ex.: Pagamento da fatura' : 'Ex: Salário, Conta de luz, etc.'}
+              {...register('description')}
+            />
             {fieldError('description')}
           </div>
 
@@ -233,17 +338,9 @@ export default function TransactionForm({ open, onOpenChange, transaction, month
               {fieldError('amount')}
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="categoryId">Categoria</Label>
-              <Controller
-                control={control}
-                name="categoryId"
-                render={({ field }) => <CategorySelect id="categoryId" value={field.value} onChange={field.onChange} />}
-              />
-            </div>
           </div>
 
-          {!transaction && (
+          {!transaction && !isTransfer && (
             <div className="rounded-md border p-3 space-y-3">
               <div className="flex items-center justify-between gap-3">
                 <Label htmlFor="parcelado" className="font-normal">
@@ -312,6 +409,10 @@ export default function TransactionForm({ open, onOpenChange, transaction, month
             <Textarea id="note" placeholder="Adicione uma observação (opcional)" className="resize-none" {...register('note')} />
           </div>
 
+          {editingTransfer && (
+            <p className="text-xs text-muted-foreground">Transferência entre contas: valor, data e status mudam nas duas pontas.</p>
+          )}
+          {isAdjustment && <p className="text-xs text-muted-foreground">Ajuste de saldo: não conta como receita nem despesa.</p>}
           {transaction?.recurringId && (
             <p className="text-xs text-muted-foreground">Gerada por uma recorrência. Alterar aqui muda só esta ocorrência.</p>
           )}

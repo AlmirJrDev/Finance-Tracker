@@ -18,6 +18,7 @@ import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { CategorySelect } from '@/components/forms/category-select';
+import { AccountSelect } from '@/components/forms/account-select';
 import { useRecurring, useRecurringMutations } from '@/hooks/use-finance';
 import { addMonths, formatDate, monthLabel, todayStr, WEEKDAYS } from '@/lib/dates';
 import { centsToInput, formatCents, parseAmountToCents } from '@/lib/money';
@@ -30,6 +31,7 @@ const schema = z
     description: z.string().trim().min(2, 'Mínimo de 2 caracteres').max(200),
     amount: z.string().refine((v) => (parseAmountToCents(v) ?? 0) > 0, 'Informe um valor maior que zero'),
     categoryId: z.string().nullable(),
+    accountId: z.string().optional(),
     frequency: z.enum(['monthly', 'weekly', 'daily']),
     dayOfMonth: z.string(),
     dayOfWeek: z.string(),
@@ -50,8 +52,9 @@ const schema = z
 
 type FormValues = z.infer<typeof schema>;
 
-function defaults(item: RecurringTransaction | null): FormValues {
+function defaults(item: RecurringTransaction | null, defaultAccountId?: string): FormValues {
   return {
+    accountId: item?.accountId ?? defaultAccountId,
     type: item?.type ?? 'expense',
     description: item?.description ?? '',
     amount: item ? centsToInput(item.amountCents) : '',
@@ -77,7 +80,7 @@ function describeSchedule(r: RecurringTransaction) {
   return r.endDate ? `${base} até ${formatDate(r.endDate)}` : base;
 }
 
-export default function RecurringTransactions({ month }: { month: string }) {
+export default function RecurringTransactions({ month, defaultAccountId }: { month: string; defaultAccountId?: string }) {
   const { data: items = [], isLoading } = useRecurring();
   const { save, toggle, remove, apply } = useRecurringMutations();
   const [editing, setEditing] = useState<RecurringTransaction | null>(null);
@@ -89,8 +92,8 @@ export default function RecurringTransactions({ month }: { month: string }) {
   const frequency = useWatch({ control, name: 'frequency' });
 
   useEffect(() => {
-    if (formOpen) reset(defaults(editing));
-  }, [formOpen, editing, reset]);
+    if (formOpen) reset(defaults(editing, defaultAccountId));
+  }, [formOpen, editing, defaultAccountId, reset]);
 
   const activeCount = items.filter((r) => r.isActive).length;
   const rangeEnd = addMonths(month, 11);
@@ -109,6 +112,7 @@ export default function RecurringTransactions({ month }: { month: string }) {
           dayOfWeek: v.frequency === 'weekly' ? Number(v.dayOfWeek) : null,
           isActive: editing?.isActive ?? true,
           autoConfirm: v.autoConfirm,
+          accountId: v.accountId ?? null,
           startDate: v.startDate,
           endDate: v.endDate || null,
           note: v.note.trim() || null,
@@ -368,13 +372,23 @@ export default function RecurringTransactions({ month }: { month: string }) {
               </div>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="rec-category">Categoria</Label>
-              <Controller
-                control={control}
-                name="categoryId"
-                render={({ field }) => <CategorySelect id="rec-category" value={field.value} onChange={field.onChange} />}
-              />
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="rec-account">Conta</Label>
+                <Controller
+                  control={control}
+                  name="accountId"
+                  render={({ field }) => <AccountSelect id="rec-account" value={field.value} onChange={field.onChange} />}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="rec-category">Categoria</Label>
+                <Controller
+                  control={control}
+                  name="categoryId"
+                  render={({ field }) => <CategorySelect id="rec-category" value={field.value} onChange={field.onChange} />}
+                />
+              </div>
             </div>
 
             <div className="flex items-center justify-between gap-3 rounded-md border p-3">

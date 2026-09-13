@@ -1,7 +1,7 @@
 'use client';
 
 import { Fragment, useMemo, useState } from 'react';
-import { CheckCircle2, ChevronDown, ChevronRight, CircleDashed, Clock, Edit, MoreVertical, Repeat, Trash2 } from 'lucide-react';
+import { ArrowLeftRight, CheckCircle2, ChevronDown, ChevronRight, CircleDashed, Clock, Edit, MoreVertical, Repeat, Scale, Trash2 } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { formatDayShort, todayStr } from '@/lib/dates';
 import { formatCents } from '@/lib/money';
+import { useAccounts } from '@/hooks/use-finance';
 import type { MonthSummary, Transaction } from '@/types/finance';
 
 type Props = {
@@ -23,6 +24,8 @@ type Props = {
   onEdit: (transaction: Transaction) => void;
   onDelete: (transaction: Transaction) => void;
   onToggleStatus: (transaction: Transaction) => void;
+  /** Mostra a conta de cada lançamento (quando o painel exibe todas as contas) */
+  showAccount?: boolean;
 };
 
 export function StatusBadge({ transaction, today }: { transaction: Pick<Transaction, 'status' | 'date' | 'type'>; today: string }) {
@@ -50,9 +53,11 @@ export function StatusBadge({ transaction, today }: { transaction: Pick<Transact
   );
 }
 
-export function TransactionsTable({ summary, transactions, onEdit, onDelete, onToggleStatus }: Props) {
+export function TransactionsTable({ summary, transactions, onEdit, onDelete, onToggleStatus, showAccount }: Props) {
   const [expanded, setExpanded] = useState<string | null>(null);
   const today = todayStr();
+  const { data: accounts = [] } = useAccounts();
+  const accountName = new Map(accounts.map((a) => [a.id, a.name]));
 
   const byDate = useMemo(() => {
     const map = new Map<string, Transaction[]>();
@@ -111,7 +116,7 @@ export function TransactionsTable({ summary, transactions, onEdit, onDelete, onT
                     </TableCell>
                     <TableCell className="text-green-600">{day.incomeCents > 0 ? formatCents(day.incomeCents) : '-'}</TableCell>
                     <TableCell className="text-red-600">{day.expenseCents > 0 ? formatCents(day.expenseCents) : '-'}</TableCell>
-                    <TableCell>{formatCents(day.incomeCents - day.expenseCents)}</TableCell>
+                    <TableCell>{formatCents(day.netCents)}</TableCell>
                     <TableCell className={day.balanceCents < 0 ? 'text-red-600 font-bold' : 'text-green-600 font-bold'}>
                       {formatCents(day.balanceCents)}
                     </TableCell>
@@ -141,6 +146,10 @@ export function TransactionsTable({ summary, transactions, onEdit, onDelete, onT
                                         {t.recurringId && (
                                           <Repeat className="h-3 w-3 text-muted-foreground" aria-label="Recorrente" />
                                         )}
+                                        {t.kind === 'transfer' && (
+                                          <ArrowLeftRight className="h-3 w-3 text-muted-foreground" aria-label="Transferência" />
+                                        )}
+                                        {t.kind === 'adjustment' && <Scale className="h-3 w-3 text-muted-foreground" aria-label="Ajuste de saldo" />}
                                         {t.description}
                                         {t.installment && (
                                           <span className="text-xs text-muted-foreground">
@@ -148,6 +157,7 @@ export function TransactionsTable({ summary, transactions, onEdit, onDelete, onT
                                           </span>
                                         )}
                                       </span>
+                                      {showAccount && <p className="text-xs text-muted-foreground">{accountName.get(t.accountId) ?? 'Conta'}</p>}
                                       {t.note && <p className="text-xs text-muted-foreground">{t.note}</p>}
                                     </TableCell>
                                     <TableCell>
