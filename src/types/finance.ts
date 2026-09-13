@@ -1,44 +1,103 @@
-export type Transaction = {
-  id: string;
-  date: Date;
-  description: string;
-  amount: number;
-  type: 'entrada' | 'saída' | 'income';
-  category?: string;
-  note?: string;
-};
+// Espelha os contratos da API (finance-tracker-backend).
+// Valores monetários sempre em centavos; datas "YYYY-MM-DD"; meses "YYYY-MM".
 
-export type RecurrenceFrequency = 'monthly' | 'weekly' | 'daily';
+export type TransactionType = 'income' | 'expense';
+export type Frequency = 'daily' | 'weekly' | 'monthly';
+
+export interface Category {
+  id: string;
+  name: string;
+  color: string;
+  icon: string | null;
+  description: string | null;
+  isDefault: boolean;
+}
+
+export interface Transaction {
+  id: string;
+  date: string;
+  description: string;
+  amountCents: number;
+  type: TransactionType;
+  categoryId: string | null;
+  category: Category | null;
+  note: string | null;
+  recurringId: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TransactionInput {
+  date: string;
+  description: string;
+  amountCents: number;
+  type: TransactionType;
+  categoryId?: string | null;
+  note?: string | null;
+}
 
 export interface RecurringTransaction {
   id: string;
   description: string;
-  amount: number;
-  type: 'entrada' | 'saída';
-  category: string;
-  note?: string;
-  frequency: RecurrenceFrequency;
-  dayOfMonth?: number;    // Para frequência mensal: dia do mês (1-31)
-  dayOfWeek?: number;     // Para frequência semanal: dia da semana (0-6, 0 = Domingo)
+  amountCents: number;
+  type: TransactionType;
+  categoryId: string | null;
+  category: Category | null;
+  frequency: Frequency;
+  dayOfMonth: number | null;
+  dayOfWeek: number | null;
   isActive: boolean;
-  startDate: Date;
-  endDate?: Date;         // Opcional: data final da recorrência
+  startDate: string;
+  endDate: string | null;
+  note: string | null;
 }
 
-export type DailyBalance = {
-  date: Date;
-  income: number;
-  expense: number;
-  balance: number;
-  dailyTransactions: Transaction[];
-};
+export type RecurringInput = Omit<RecurringTransaction, 'id' | 'category'>;
 
-export interface MonthlyData {
-  month: number;
+export interface DaySummary {
+  date: string;
+  incomeCents: number;
+  expenseCents: number;
+  balanceCents: number;
+  transactionCount: number;
+}
+
+export interface MonthTotals {
+  month: string;
+  initialBalanceCents: number;
+  incomeCents: number;
+  expenseCents: number;
+  resultCents: number;
+  finalBalanceCents: number;
+  transactionCount: number;
+  days: DaySummary[];
+}
+
+export interface CategoryTotal {
+  categoryId: string | null;
+  name: string;
+  color: string;
+  icon: string | null;
+  incomeCents: number;
+  expenseCents: number;
+  transactionCount: number;
+}
+
+export interface MonthSummary extends MonthTotals {
+  byCategory: CategoryTotal[];
+}
+
+export interface YearSummary {
   year: number;
-  initialBalance?: number; // Saldo inicial do mês (vindo do mês anterior)
-  totalIncome: number;
-  totalExpense: number;
-  performance: number;
-  dailyBalances: DailyBalance[];
+  initialBalanceCents: number;
+  incomeCents: number;
+  expenseCents: number;
+  resultCents: number;
+  finalBalanceCents: number;
+  months: MonthTotals[];
+}
+
+export interface ActiveMonth {
+  month: string;
+  transactionCount: number;
 }

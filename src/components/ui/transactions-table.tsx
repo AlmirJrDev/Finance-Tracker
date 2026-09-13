@@ -1,181 +1,158 @@
 'use client';
 
-import { Fragment, useState } from 'react';
-import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
-} from '@/components/ui/table';
+import { Fragment, useMemo, useState } from 'react';
+import { ChevronDown, ChevronRight, Edit, MoreVertical, Repeat, Trash2 } from 'lucide-react';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { 
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger
-} from '@/components/ui/dropdown-menu';
-import { Edit, MoreVertical, Trash2 } from 'lucide-react';
-import { DailyBalance, Transaction } from '@/types/finance';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { formatDayShort } from '@/lib/dates';
+import { formatCents } from '@/lib/money';
+import type { MonthSummary, Transaction } from '@/types/finance';
 
-interface TransactionsTableProps {
-  dailyBalances: DailyBalance[];
-  onEditTransaction: (transaction: Transaction) => void;
-  onDeleteTransaction: (transactionId: string, date: Date) => void;
-}
+type Props = {
+  summary: MonthSummary;
+  transactions: Transaction[];
+  onEdit: (transaction: Transaction) => void;
+  onDelete: (transaction: Transaction) => void;
+};
 
-export function TransactionsTable({ 
-  dailyBalances, 
-  onEditTransaction, 
-  onDeleteTransaction 
-}: TransactionsTableProps) {
-  const [expandedDay, setExpandedDay] = useState<number | null>(null);
-  
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL'
-    }).format(value);
-  };
+export function TransactionsTable({ summary, transactions, onEdit, onDelete }: Props) {
+  const [expanded, setExpanded] = useState<string | null>(null);
 
-  const formatDate = (date: Date) => {
-    return new Intl.DateTimeFormat('pt-BR').format(date);
-  };
+  const byDate = useMemo(() => {
+    const map = new Map<string, Transaction[]>();
+    for (const t of transactions) map.set(t.date, [...(map.get(t.date) ?? []), t]);
+    return map;
+  }, [transactions]);
 
-  const toggleDay = (day: number) => {
-    if (expandedDay === day) {
-      setExpandedDay(null);
-    } else {
-      setExpandedDay(day);
-    }
-  };
-
-  const processedBalances = dailyBalances.map(day => ({
-    ...day,
-    date: day.date instanceof Date ? day.date : new Date(day.date)
-  }));
-
-  const daysWithTransactions = processedBalances.filter(
-    day => day.dailyTransactions.length > 0 || day.income > 0 || day.expense > 0
-  );
-  daysWithTransactions.sort((a, b) => b.date.getTime() - a.date.getTime());
+  const days = summary.days.filter((d) => d.transactionCount > 0).reverse();
 
   return (
     <Card>
       <CardHeader>
         <CardTitle>Movimentações do Mês</CardTitle>
       </CardHeader>
-      <CardContent>
+      <CardContent className="overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow>
               <TableHead>Data</TableHead>
               <TableHead>Entradas</TableHead>
               <TableHead>Saídas</TableHead>
-              <TableHead>Saldo Diário</TableHead>
+              <TableHead>Saldo do Dia</TableHead>
               <TableHead>Saldo Acumulado</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-          {daysWithTransactions.length > 0 ? (
-            daysWithTransactions.map((day, dayIndex) => {
-              const dateKey = `day-${dayIndex}-${day.date.toISOString().split('T')[0]}`;
-              
+            {days.length === 0 && (
+              <TableRow>
+                <TableCell colSpan={5} className="text-center py-6">
+                  Nenhuma transação registrada para este mês.
+                </TableCell>
+              </TableRow>
+            )}
+
+            {days.map((day) => {
+              const isOpen = expanded === day.date;
+              const dayTransactions = byDate.get(day.date) ?? [];
               return (
-                <Fragment key={dateKey}>
-                  <TableRow 
+                <Fragment key={day.date}>
+                  <TableRow
                     className="cursor-pointer"
-                    onClick={() => toggleDay(day.date.getDate())}
+                    onClick={() => setExpanded(isOpen ? null : day.date)}
+                    aria-expanded={isOpen}
                   >
-                    <TableCell>{formatDate(day.date)}</TableCell>
-                    <TableCell className="text-green-600">{day.income > 0 ? formatCurrency(day.income) : '-'}</TableCell>
-                    <TableCell className="text-red-600">{day.expense > 0 ? formatCurrency(day.expense) : '-'}</TableCell>
-                    <TableCell>{formatCurrency(day.income - day.expense)}</TableCell>
-                    <TableCell className={day.balance < 0 ? 'text-red-600 font-bold' : 'text-green-600 font-bold'}>{formatCurrency(day.balance)}</TableCell>
+                    <TableCell className="whitespace-nowrap">
+                      <span className="inline-flex items-center gap-1">
+                        {isOpen ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+                        {formatDayShort(day.date)}
+                        <span className="text-xs text-muted-foreground">({day.transactionCount})</span>
+                      </span>
+                    </TableCell>
+                    <TableCell className="text-green-600">{day.incomeCents > 0 ? formatCents(day.incomeCents) : '-'}</TableCell>
+                    <TableCell className="text-red-600">{day.expenseCents > 0 ? formatCents(day.expenseCents) : '-'}</TableCell>
+                    <TableCell>{formatCents(day.incomeCents - day.expenseCents)}</TableCell>
+                    <TableCell className={day.balanceCents < 0 ? 'text-red-600 font-bold' : 'text-green-600 font-bold'}>
+                      {formatCents(day.balanceCents)}
+                    </TableCell>
                   </TableRow>
-                  
-                  {expandedDay === day.date.getDate() && (
-                    <TableRow key={`expanded-${dateKey}`}>
-                      <TableCell colSpan={5} className="p-0 ">
+
+                  {isOpen && (
+                    <TableRow>
+                      <TableCell colSpan={5} className="p-0">
                         <div className="p-4">
-                          <h4 className="text-sm font-medium mb-2">Transações do dia</h4>
-                          
-                          {day.dailyTransactions.length > 0 ? (
-                            <Table>
-                              <TableHeader>
-                                <TableRow>
-                                  <TableHead>Descrição</TableHead>
-                                  <TableHead>Categoria</TableHead>
-                                  <TableHead>Valor</TableHead>
-                                  <TableHead>Tipo</TableHead>
-                                  <TableHead></TableHead>
-                                </TableRow>
-                              </TableHeader>
-                              <TableBody>
-                                {day.dailyTransactions.map((transaction, transIndex) => {
-                                  const transactionKey = `trans-${dayIndex}-${transIndex}-${transaction.id}`;
-                                  
-                                  return (
-                                    <TableRow key={transactionKey}>
-                                      <TableCell>{transaction.description}</TableCell>
-                                      <TableCell>
-                                        <Badge variant="outline">{transaction.category}</Badge>
-                                      </TableCell>
-                                      <TableCell className={transaction.type === 'income' || transaction.type === 'entrada' ? 'text-green-600' : 'text-red-600'}>
-                                        {formatCurrency(transaction.amount)}
-                                      </TableCell>
-                                      <TableCell>
-                                        <Badge variant={transaction.type === 'income' || transaction.type === 'entrada' ? 'default' : 'destructive'}>
-                                          {transaction.type === 'income' || transaction.type === 'entrada' ? 'Entrada' : 'Saída'}
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead>Descrição</TableHead>
+                                <TableHead>Categoria</TableHead>
+                                <TableHead>Valor</TableHead>
+                                <TableHead>Tipo</TableHead>
+                                <TableHead className="w-10" />
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {dayTransactions.map((t) => {
+                                const income = t.type === 'income';
+                                return (
+                                  <TableRow key={t.id}>
+                                    <TableCell>
+                                      <span className="inline-flex items-center gap-1">
+                                        {t.recurringId && (
+                                          <Repeat className="h-3 w-3 text-muted-foreground" aria-label="Recorrente" />
+                                        )}
+                                        {t.description}
+                                      </span>
+                                      {t.note && <p className="text-xs text-muted-foreground">{t.note}</p>}
+                                    </TableCell>
+                                    <TableCell>
+                                      {t.category ? (
+                                        <Badge variant="outline" style={{ borderColor: t.category.color }}>
+                                          {t.category.icon} {t.category.name}
                                         </Badge>
-                                      </TableCell>
-                                      <TableCell>
-                                        <DropdownMenu>
-                                          <DropdownMenuTrigger asChild>
-                                            <Button variant="ghost" size="icon">
-                                              <MoreVertical className="h-4 w-4" />
-                                            </Button>
-                                          </DropdownMenuTrigger>
-                                          <DropdownMenuContent align="end">
-                                            <DropdownMenuItem onClick={() => onEditTransaction(transaction)}>
-                                              <Edit className="mr-2 h-4 w-4" />
-                                              Editar
-                                            </DropdownMenuItem>
-                                            <DropdownMenuItem 
-                                              onClick={() => onDeleteTransaction(transaction.id, day.date)}
-                                              className="text-red-600"
-                                            >
-                                              <Trash2 className="mr-2 h-4 w-4" />
-                                              Excluir
-                                            </DropdownMenuItem>
-                                          </DropdownMenuContent>
-                                        </DropdownMenu>
-                                      </TableCell>
-                                    </TableRow>
-                                  );
-                                })}
-                              </TableBody>
-                            </Table>
-                          ) : (
-                            <p className="text-sm text-gray-500">Não há transações detalhadas para este dia.</p>
-                          )}
+                                      ) : (
+                                        <span className="text-muted-foreground">—</span>
+                                      )}
+                                    </TableCell>
+                                    <TableCell className={income ? 'text-green-600' : 'text-red-600'}>
+                                      {formatCents(t.amountCents)}
+                                    </TableCell>
+                                    <TableCell>
+                                      <Badge variant={income ? 'default' : 'destructive'}>{income ? 'Entrada' : 'Saída'}</Badge>
+                                    </TableCell>
+                                    <TableCell>
+                                      <DropdownMenu>
+                                        <DropdownMenuTrigger asChild>
+                                          <Button variant="ghost" size="icon" aria-label="Ações">
+                                            <MoreVertical className="h-4 w-4" />
+                                          </Button>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent align="end">
+                                          <DropdownMenuItem onClick={() => onEdit(t)}>
+                                            <Edit className="mr-2 h-4 w-4" />
+                                            Editar
+                                          </DropdownMenuItem>
+                                          <DropdownMenuItem onClick={() => onDelete(t)} className="text-red-600">
+                                            <Trash2 className="mr-2 h-4 w-4" />
+                                            Excluir
+                                          </DropdownMenuItem>
+                                        </DropdownMenuContent>
+                                      </DropdownMenu>
+                                    </TableCell>
+                                  </TableRow>
+                                );
+                              })}
+                            </TableBody>
+                          </Table>
                         </div>
                       </TableCell>
                     </TableRow>
                   )}
                 </Fragment>
               );
-            })
-          ) : (
-            <TableRow>
-              <TableCell colSpan={5} className="text-center py-6">
-                Nenhuma transação registrada para este mês.
-              </TableCell>
-            </TableRow>
-          )}
+            })}
           </TableBody>
         </Table>
       </CardContent>

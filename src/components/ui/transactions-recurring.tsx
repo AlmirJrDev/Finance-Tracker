@@ -1,338 +1,244 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import { Controller, useForm, useWatch } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+import { Calendar, CalendarRange, Edit, Loader2, MoreVertical, Pause, Play, Plus, Trash2 } from 'lucide-react';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import {
-  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
-} from '@/components/ui/dialog';
-import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from '@/components/ui/select';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { Plus, Calendar, Edit, MoreVertical, Trash2, PlusCircle, CalendarRange, Loader2 } from 'lucide-react';
-import { Transaction } from '@/types/finance';
-import { toast } from 'sonner';
+import { CategorySelect } from '@/components/forms/category-select';
+import { useRecurring, useRecurringMutations } from '@/hooks/use-finance';
+import { addMonths, formatDate, monthLabel, todayStr, WEEKDAYS } from '@/lib/dates';
+import { centsToInput, formatCents, parseAmountToCents } from '@/lib/money';
 import { playNotificationSound } from '@/lib/notification';
-import api from '@/lib/api';
+import type { RecurringTransaction } from '@/types/finance';
 
-type ApiRecurring = {
-  _id: string;
-  description: string;
-  amount: number;
-  type: 'entrada' | 'saída';
-  categoryName?: string;
-  category?: string;
-  note?: string;
-  dayOfMonth: number;
-  isActive: boolean;
-  frequency: string;
-};
+const schema = z
+  .object({
+    type: z.enum(['income', 'expense']),
+    description: z.string().trim().min(2, 'Mínimo de 2 caracteres').max(200),
+    amount: z.string().refine((v) => (parseAmountToCents(v) ?? 0) > 0, 'Informe um valor maior que zero'),
+    categoryId: z.string().nullable(),
+    frequency: z.enum(['monthly', 'weekly', 'daily']),
+    dayOfMonth: z.string(),
+    dayOfWeek: z.string(),
+    startDate: z.string().min(1, 'Informe a data de início'),
+    endDate: z.string(),
+    note: z.string().max(500),
+  })
+  .superRefine((v, ctx) => {
+    const day = Number(v.dayOfMonth);
+    if (v.frequency === 'monthly' && !(Number.isInteger(day) && day >= 1 && day <= 31)) {
+      ctx.addIssue({ code: 'custom', path: ['dayOfMonth'], message: 'Dia entre 1 e 31' });
+    }
+    if (v.endDate && v.endDate < v.startDate) {
+      ctx.addIssue({ code: 'custom', path: ['endDate'], message: 'Deve ser depois do início' });
+    }
+  });
 
-type RecurringTransactionsProps = {
-  onAddTransactions: (transactions: Transaction[]) => void;
-  selectedMonth: number; // 0-11
-  selectedYear: number;
-};
+type FormValues = z.infer<typeof schema>;
 
-const emptyForm = {
-  description: '',
-  amount: 0,
-  type: 'saída' as 'entrada' | 'saída',
-  category: '',
-  note: '',
-  dayOfMonth: 1,
-};
+function defaults(item: RecurringTransaction | null): FormValues {
+  return {
+    type: item?.type ?? 'expense',
+    description: item?.description ?? '',
+    amount: item ? centsToInput(item.amountCents) : '',
+    categoryId: item?.categoryId ?? null,
+    frequency: item?.frequency ?? 'monthly',
+    dayOfMonth: String(item?.dayOfMonth ?? Number(todayStr().slice(8, 10))),
+    dayOfWeek: String(item?.dayOfWeek ?? 1),
+    // Editar não reinicia a data de início (bug da versão anterior)
+    startDate: item?.startDate ?? `${todayStr().slice(0, 7)}-01`,
+    endDate: item?.endDate ?? '',
+    note: item?.note ?? '',
+  };
+}
 
-export default function RecurringTransactions({
-  onAddTransactions,
-  selectedMonth,
-  selectedYear,
-}: RecurringTransactionsProps) {
-  const [isFormOpen, setIsFormOpen] = useState(false);
-  const [recurringList, setRecurringList] = useState<ApiRecurring[]>([]);
-  const [editItem, setEditItem] = useState<ApiRecurring | null>(null);
-  const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
-  const [newCategory, setNewCategory] = useState('');
-  const [showNewCategory, setShowNewCategory] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const [isApplying, setIsApplying] = useState(false);
-  const [showApplyConfirm, setShowApplyConfirm] = useState(false);
-  const [form, setForm] = useState(emptyForm);
+function describeSchedule(r: RecurringTransaction) {
+  const base =
+    r.frequency === 'monthly'
+      ? `Todo dia ${r.dayOfMonth}`
+      : r.frequency === 'weekly'
+        ? `Toda ${WEEKDAYS[r.dayOfWeek ?? 0].toLowerCase()}`
+        : 'Todos os dias';
+  return r.endDate ? `${base} até ${formatDate(r.endDate)}` : base;
+}
 
-  // Carrega recorrentes e categorias da API
+export default function RecurringTransactions({ month }: { month: string }) {
+  const { data: items = [], isLoading } = useRecurring();
+  const { save, toggle, remove, apply } = useRecurringMutations();
+  const [editing, setEditing] = useState<RecurringTransaction | null>(null);
+  const [formOpen, setFormOpen] = useState(false);
+  const [confirmRange, setConfirmRange] = useState(false);
+
+  const form = useForm<FormValues>({ resolver: zodResolver(schema), defaultValues: defaults(null) });
+  const { register, control, handleSubmit, reset, formState } = form;
+  const frequency = useWatch({ control, name: 'frequency' });
+
   useEffect(() => {
-    setIsLoading(true);
-    Promise.all([api.getRecurring(), api.getCategories()])
-      .then(([recRes, catRes]) => {
-        setRecurringList(recRes.data);
-        setCategories(catRes.data.map((c: any) => ({ id: c._id, name: c.name })));
-      })
-      .catch((err) => toast.error('Erro ao carregar dados: ' + err.message))
-      .finally(() => setIsLoading(false));
-  }, []);
+    if (formOpen) reset(defaults(editing));
+  }, [formOpen, editing, reset]);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target;
-    setForm((prev) => ({
-      ...prev,
-      [name]: name === 'amount' || name === 'dayOfMonth' ? parseFloat(value) || 0 : value,
-    }));
-  };
+  const activeCount = items.filter((r) => r.isActive).length;
+  const rangeEnd = addMonths(month, 11);
 
-  const handleSelectChange = (name: string, value: string) => {
-    setForm((prev) => ({ ...prev, [name]: value }));
-  };
-
-  const handleAddCategory = async () => {
-    if (!newCategory.trim()) return;
+  const onSubmit = handleSubmit(async (v) => {
     try {
-      const res = await api.createCategory({ name: newCategory.trim() });
-      const created = { id: res.data._id, name: res.data.name };
-      setCategories((prev) => [...prev, created]);
-      setForm((prev) => ({ ...prev, category: created.id }));
-      setNewCategory('');
-      setShowNewCategory(false);
-    } catch (err: any) {
-      toast.error('Erro ao criar categoria: ' + err.message);
-    }
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!form.description || !form.amount || form.amount <= 0) {
-      toast.error('Preencha a descrição e um valor válido.');
-      return;
-    }
-    if (!form.dayOfMonth || form.dayOfMonth < 1 || form.dayOfMonth > 31) {
-      toast.error('Informe um dia do mês válido (1-31).');
-      return;
-    }
-
-    const today = new Date();
-    const payload = {
-      description: form.description,
-      amount: form.amount,
-      type: form.type,
-      category: form.category || undefined,
-      note: form.note || undefined,
-      frequency: 'monthly' as const,
-      dayOfMonth: form.dayOfMonth,
-      isActive: true,
-      startDate: today.toISOString().split('T')[0],
-    };
-
-    try {
-      if (editItem) {
-        const res = await api.updateRecurring(editItem._id, payload);
-        setRecurringList((prev) => prev.map((r) => r._id === editItem._id ? res.data : r));
-        toast.success('Transação recorrente atualizada.');
-      } else {
-        const res = await api.createRecurring(payload);
-        setRecurringList((prev) => [...prev, res.data]);
-        toast.success('Transação recorrente criada.');
-      }
+      await save.mutateAsync({
+        id: editing?.id,
+        input: {
+          type: v.type,
+          description: v.description,
+          amountCents: parseAmountToCents(v.amount)!,
+          categoryId: v.categoryId,
+          frequency: v.frequency,
+          dayOfMonth: v.frequency === 'monthly' ? Number(v.dayOfMonth) : null,
+          dayOfWeek: v.frequency === 'weekly' ? Number(v.dayOfWeek) : null,
+          isActive: editing?.isActive ?? true,
+          startDate: v.startDate,
+          endDate: v.endDate || null,
+          note: v.note.trim() || null,
+        },
+      });
       playNotificationSound();
-      resetForm();
-      setIsFormOpen(false);
-    } catch (err: any) {
-      toast.error('Erro ao salvar: ' + err.message);
+      toast.success(editing ? 'Recorrência atualizada.' : 'Recorrência criada.', {
+        description: 'Use "Aplicar" para gerar as transações nos meses desejados.',
+      });
+      setFormOpen(false);
+    } catch (err) {
+      toast.error('Erro ao salvar', { description: (err as Error).message });
     }
-  };
+  });
 
-  const resetForm = () => {
-    setForm(emptyForm);
-    setEditItem(null);
-    setShowNewCategory(false);
-  };
-
-  const handleEdit = (item: ApiRecurring) => {
-    setEditItem(item);
-    setForm({
-      description: item.description,
-      amount: item.amount,
-      type: item.type,
-      category: item.category || '',
-      note: item.note || '',
-      dayOfMonth: item.dayOfMonth,
-    });
-    setIsFormOpen(true);
-  };
-
-  const handleDelete = async (id: string) => {
-    if (!confirm('Tem certeza que deseja excluir esta transação recorrente?')) return;
+  const runApply = async (from: string, to: string) => {
     try {
-      await api.deleteRecurring(id);
-      setRecurringList((prev) => prev.filter((r) => r._id !== id));
-      toast.success('Transação recorrente removida.');
-    } catch (err: any) {
-      toast.error('Erro ao excluir: ' + err.message);
-    }
-  };
-
-  const handleToggleActive = async (item: ApiRecurring) => {
-    try {
-      const res = await api.updateRecurring(item._id, { isActive: !item.isActive });
-      setRecurringList((prev) => prev.map((r) => r._id === item._id ? res.data : r));
-    } catch (err: any) {
-      toast.error('Erro ao atualizar status: ' + err.message);
-    }
-  };
-
-  // Aplica todas as recorrentes ativas ao mês selecionado
-  const handleApplyToMonth = async () => {
-    const active = recurringList.filter((r) => r.isActive);
-    if (active.length === 0) {
-      toast.error('Não há transações recorrentes ativas.');
-      return;
-    }
-
-    setIsApplying(true);
-    const apiMonth = selectedMonth + 1; // API usa 1-12
-
-    try {
-      await Promise.all(
-        active.map((r) => api.applyRecurringToMonth(r._id, selectedYear, apiMonth))
+      const result = await apply.mutateAsync({ from, to });
+      playNotificationSound();
+      toast.success(
+        result.created > 0 ? `${result.created} transação(ões) criada(s).` : 'Nada novo para criar.',
+        { description: result.existing > 0 ? `${result.existing} já existia(m) e foram mantidas.` : undefined }
       );
-      playNotificationSound();
-      toast.success(`Recorrentes aplicadas ao mês ${apiMonth}/${selectedYear}.`);
-      onAddTransactions([]); // sinaliza para o HomePage recarregar o mês
-    } catch (err: any) {
-      toast.error('Erro ao aplicar recorrentes: ' + err.message);
-    } finally {
-      setIsApplying(false);
+      setConfirmRange(false);
+    } catch (err) {
+      toast.error('Erro ao aplicar', { description: (err as Error).message });
     }
   };
 
-  // Aplica a todos os meses futuros até dez/2026
-  const handleApplyAllMonths = async () => {
-    const active = recurringList.filter((r) => r.isActive);
-    if (active.length === 0) {
-      toast.error('Não há transações recorrentes ativas.');
-      return;
-    }
-
-    setIsApplying(true);
-    setShowApplyConfirm(false);
-
-    const now = new Date();
-    const months: { year: number; month: number }[] = [];
-
-    for (let y = now.getFullYear(); y <= 2026; y++) {
-      const start = y === now.getFullYear() ? now.getMonth() + 1 : 1;
-      const end = y === 2026 ? 12 : 12;
-      for (let m = start; m <= end; m++) {
-        months.push({ year: y, month: m });
-      }
-    }
-
-    let applied = 0;
-    try {
-      for (const { year, month } of months) {
-        await Promise.all(active.map((r) => api.applyRecurringToMonth(r._id, year, month)));
-        applied++;
-      }
-      playNotificationSound();
-      toast.success(`Recorrentes aplicadas em ${applied} meses.`);
-      onAddTransactions([]);
-    } catch (err: any) {
-      toast.error('Erro ao aplicar: ' + err.message);
-    } finally {
-      setIsApplying(false);
-    }
-  };
-
-  const formatCurrency = (value: number) =>
-    new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
-
-  const activeCount = recurringList.filter((r) => r.isActive).length;
+  const fieldError = (name: keyof FormValues) =>
+    formState.errors[name] && <p className="text-xs text-destructive">{formState.errors[name]?.message}</p>;
 
   return (
     <>
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
+        <CardHeader className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <CardTitle>Transações Recorrentes</CardTitle>
-          <div className="flex gap-2">
+          <div className="flex flex-col sm:flex-row gap-2">
             <Button
               variant="outline"
-              onClick={() => setShowApplyConfirm(true)}
-              disabled={activeCount === 0 || isApplying}
+              onClick={() => setConfirmRange(true)}
+              disabled={activeCount === 0 || apply.isPending}
               className="flex items-center gap-1"
             >
               <CalendarRange className="h-4 w-4" />
-              Aplicar a Todos os Meses
+              Aplicar nos próximos 12 meses
             </Button>
             <Button
               variant="outline"
-              onClick={handleApplyToMonth}
-              disabled={activeCount === 0 || isApplying}
+              onClick={() => runApply(month, month)}
+              disabled={activeCount === 0 || apply.isPending}
               className="flex items-center gap-1"
             >
-              {isApplying ? <Loader2 className="h-4 w-4 animate-spin" /> : <Calendar className="h-4 w-4" />}
-              Aplicar ao Mês Atual ({activeCount})
+              {apply.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Calendar className="h-4 w-4" />}
+              Aplicar em {monthLabel(month)} ({activeCount})
             </Button>
-            <Button onClick={() => setIsFormOpen(true)} className="flex items-center gap-1">
+            <Button
+              onClick={() => {
+                setEditing(null);
+                setFormOpen(true);
+              }}
+              className="flex items-center gap-1"
+            >
               <Plus className="h-4 w-4" />
               Nova Recorrente
             </Button>
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="overflow-x-auto">
           {isLoading ? (
             <div className="flex justify-center py-8">
               <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
             </div>
-          ) : recurringList.length > 0 ? (
+          ) : items.length > 0 ? (
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Descrição</TableHead>
-                  <TableHead>Dia do Mês</TableHead>
+                  <TableHead>Quando</TableHead>
                   <TableHead>Valor</TableHead>
                   <TableHead>Categoria</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead>Ações</TableHead>
+                  <TableHead className="w-10" />
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {recurringList.map((rec) => (
-                  <TableRow key={rec._id}>
-                    <TableCell>{rec.description}</TableCell>
-                    <TableCell>Dia {rec.dayOfMonth}</TableCell>
-                    <TableCell className={rec.type === 'entrada' ? 'text-green-600' : 'text-red-600'}>
-                      {formatCurrency(rec.amount)}
+                {items.map((r) => (
+                  <TableRow key={r.id} className={r.isActive ? '' : 'opacity-60'}>
+                    <TableCell>{r.description}</TableCell>
+                    <TableCell className="whitespace-nowrap">
+                      {describeSchedule(r)}
+                      <p className="text-xs text-muted-foreground">desde {formatDate(r.startDate)}</p>
+                    </TableCell>
+                    <TableCell className={r.type === 'income' ? 'text-green-600' : 'text-red-600'}>
+                      {formatCents(r.amountCents)}
                     </TableCell>
                     <TableCell>
-                      <Badge variant="outline">{rec.categoryName || '—'}</Badge>
+                      <Badge variant="outline">{r.category ? `${r.category.icon ?? ''} ${r.category.name}` : '—'}</Badge>
                     </TableCell>
                     <TableCell>
-                      <Badge variant={rec.isActive ? 'default' : 'secondary'}>
-                        {rec.isActive ? 'Ativo' : 'Inativo'}
-                      </Badge>
+                      <Badge variant={r.isActive ? 'default' : 'secondary'}>{r.isActive ? 'Ativa' : 'Pausada'}</Badge>
                     </TableCell>
                     <TableCell>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon">
+                          <Button variant="ghost" size="icon" aria-label="Ações">
                             <MoreVertical className="h-4 w-4" />
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => handleEdit(rec)}>
+                          <DropdownMenuItem
+                            onClick={() => {
+                              setEditing(r);
+                              setFormOpen(true);
+                            }}
+                          >
                             <Edit className="mr-2 h-4 w-4" /> Editar
                           </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleToggleActive(rec)}>
-                            <Calendar className="mr-2 h-4 w-4" />
-                            {rec.isActive ? 'Desativar' : 'Ativar'}
+                          <DropdownMenuItem onClick={() => toggle.mutate({ id: r.id, isActive: !r.isActive })}>
+                            {r.isActive ? <Pause className="mr-2 h-4 w-4" /> : <Play className="mr-2 h-4 w-4" />}
+                            {r.isActive ? 'Pausar' : 'Ativar'}
                           </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleDelete(rec._id)} className="text-red-600">
+                          <DropdownMenuItem
+                            className="text-red-600"
+                            onClick={async () => {
+                              if (!confirm(`Excluir "${r.description}"? As transações já geradas continuam no histórico.`)) return;
+                              try {
+                                await remove.mutateAsync(r.id);
+                                toast.success('Recorrência removida.');
+                              } catch (err) {
+                                toast.error('Erro ao excluir', { description: (err as Error).message });
+                              }
+                            }}
+                          >
                             <Trash2 className="mr-2 h-4 w-4" /> Excluir
                           </DropdownMenuItem>
                         </DropdownMenuContent>
@@ -343,7 +249,7 @@ export default function RecurringTransactions({
               </TableBody>
             </Table>
           ) : (
-            <div className="text-center py-8 text-gray-500">
+            <div className="text-center py-8 text-muted-foreground">
               <p>Você ainda não cadastrou transações recorrentes.</p>
               <p>Adicione suas despesas e receitas fixas para automatizar seu controle financeiro.</p>
             </div>
@@ -351,108 +257,164 @@ export default function RecurringTransactions({
         </CardContent>
       </Card>
 
-      {/* Formulário */}
-      <Dialog open={isFormOpen} onOpenChange={(open) => { if (!open) resetForm(); setIsFormOpen(open); }}>
-        <DialogContent className="sm:max-w-[500px]">
+      <Dialog open={formOpen} onOpenChange={setFormOpen}>
+        <DialogContent className="sm:max-w-[520px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{editItem ? 'Editar Transação Recorrente' : 'Nova Transação Recorrente'}</DialogTitle>
-            <DialogDescription>Cadastre um pagamento ou recebimento que se repete todo mês.</DialogDescription>
+            <DialogTitle>{editing ? 'Editar Recorrência' : 'Nova Recorrência'}</DialogTitle>
+            <DialogDescription>Um pagamento ou recebimento que se repete.</DialogDescription>
           </DialogHeader>
 
-          <form onSubmit={handleSubmit} className="space-y-4 py-4">
+          <form onSubmit={onSubmit} className="space-y-4 py-2" noValidate>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Tipo</Label>
-                <Select value={form.type} onValueChange={(v) => handleSelectChange('type', v)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="entrada">Entrada</SelectItem>
-                    <SelectItem value="saída">Saída</SelectItem>
-                  </SelectContent>
-                </Select>
+                <Label htmlFor="rec-type">Tipo</Label>
+                <Controller
+                  control={control}
+                  name="type"
+                  render={({ field }) => (
+                    <Select value={field.value} onValueChange={field.onChange}>
+                      <SelectTrigger id="rec-type" className="w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="income">Entrada</SelectItem>
+                        <SelectItem value="expense">Saída</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
               </div>
               <div className="space-y-2">
-                <Label>Dia do Mês</Label>
-                <Input name="dayOfMonth" type="number" min="1" max="31"
-                  value={form.dayOfMonth || ''} onChange={handleChange} placeholder="Ex: 10" />
+                <Label htmlFor="rec-amount">Valor (R$)</Label>
+                <Input id="rec-amount" inputMode="decimal" placeholder="0,00" {...register('amount')} />
+                {fieldError('amount')}
               </div>
             </div>
 
             <div className="space-y-2">
-              <Label>Descrição</Label>
-              <Input name="description" value={form.description} onChange={handleChange}
-                placeholder="Ex: Aluguel, Salário, etc." />
+              <Label htmlFor="rec-description">Descrição</Label>
+              <Input id="rec-description" placeholder="Ex: Aluguel, Salário, Academia" {...register('description')} />
+              {fieldError('description')}
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Valor (R$)</Label>
-                <Input name="amount" type="number" step="0.01" min="0"
-                  value={form.amount || ''} onChange={handleChange} placeholder="0,00" />
+                <Label htmlFor="rec-frequency">Frequência</Label>
+                <Controller
+                  control={control}
+                  name="frequency"
+                  render={({ field }) => (
+                    <Select value={field.value} onValueChange={field.onChange}>
+                      <SelectTrigger id="rec-frequency" className="w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="monthly">Mensal</SelectItem>
+                        <SelectItem value="weekly">Semanal</SelectItem>
+                        <SelectItem value="daily">Diária</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
+              </div>
+
+              {frequency === 'monthly' && (
+                <div className="space-y-2">
+                  <Label htmlFor="rec-day">Dia do mês</Label>
+                  <Input id="rec-day" type="number" min={1} max={31} {...register('dayOfMonth')} />
+                  {fieldError('dayOfMonth')}
+                </div>
+              )}
+              {frequency === 'weekly' && (
+                <div className="space-y-2">
+                  <Label htmlFor="rec-weekday">Dia da semana</Label>
+                  <Controller
+                    control={control}
+                    name="dayOfWeek"
+                    render={({ field }) => (
+                      <Select value={field.value} onValueChange={field.onChange}>
+                        <SelectTrigger id="rec-weekday" className="w-full">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {WEEKDAYS.map((name, i) => (
+                            <SelectItem key={name} value={String(i)}>
+                              {name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  />
+                </div>
+              )}
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="rec-start">Início</Label>
+                <Input id="rec-start" type="date" {...register('startDate')} />
+                {fieldError('startDate')}
               </div>
               <div className="space-y-2">
-                <Label>Categoria</Label>
-                {showNewCategory ? (
-                  <div className="flex space-x-2">
-                    <Input value={newCategory} onChange={(e) => setNewCategory(e.target.value)}
-                      placeholder="Nova categoria"
-                      onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddCategory())} />
-                    <Button type="button" size="sm" onClick={handleAddCategory}>+</Button>
-                  </div>
-                ) : (
-                  <Select value={form.category} onValueChange={(v) => handleSelectChange('category', v)}>
-                    <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
-                    <SelectContent>
-                      {categories.map((cat) => (
-                        <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
-                      ))}
-                      <div className="py-2 px-2 border-t">
-                        <Button type="button" variant="ghost" size="sm"
-                          className="w-full flex items-center justify-center gap-1"
-                          onClick={() => setShowNewCategory(true)}>
-                          <PlusCircle className="h-4 w-4 mr-1" /> Adicionar categoria
-                        </Button>
-                      </div>
-                    </SelectContent>
-                  </Select>
-                )}
+                <Label htmlFor="rec-end">Fim (opcional)</Label>
+                <Input id="rec-end" type="date" {...register('endDate')} />
+                {fieldError('endDate')}
               </div>
             </div>
 
             <div className="space-y-2">
-              <Label>Observação</Label>
-              <Textarea name="note" value={form.note} onChange={handleChange}
-                placeholder="Adicione uma observação (opcional)" className="resize-none" />
+              <Label htmlFor="rec-category">Categoria</Label>
+              <Controller
+                control={control}
+                name="categoryId"
+                render={({ field }) => <CategorySelect id="rec-category" value={field.value} onChange={field.onChange} />}
+              />
             </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="rec-note">Observação</Label>
+              <Textarea id="rec-note" placeholder="Opcional" className="resize-none" {...register('note')} />
+            </div>
+
+            {editing && (
+              <p className="text-xs text-muted-foreground">
+                Alterações valem para as próximas aplicações; transações já geradas não mudam.
+              </p>
+            )}
 
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => { resetForm(); setIsFormOpen(false); }}>
+              <Button type="button" variant="outline" onClick={() => setFormOpen(false)}>
                 Cancelar
               </Button>
-              <Button type="submit">{editItem ? 'Atualizar' : 'Adicionar'}</Button>
+              <Button type="submit" disabled={save.isPending}>
+                {save.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                {editing ? 'Atualizar' : 'Adicionar'}
+              </Button>
             </DialogFooter>
           </form>
         </DialogContent>
       </Dialog>
 
-      {/* Confirmação aplicar todos os meses */}
-      <Dialog open={showApplyConfirm} onOpenChange={setShowApplyConfirm}>
-        <DialogContent className="sm:max-w-[500px]">
+      <Dialog open={confirmRange} onOpenChange={setConfirmRange}>
+        <DialogContent className="sm:max-w-[480px]">
           <DialogHeader>
-            <DialogTitle>Aplicar a Todos os Meses Futuros</DialogTitle>
+            <DialogTitle>Aplicar nos próximos 12 meses</DialogTitle>
             <DialogDescription>
-              Isso irá aplicar todas as recorrentes ativas de {new Date().toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })} até dezembro de 2026.
+              Gera as transações das {activeCount} recorrência(s) ativa(s) de {monthLabel(month)} até{' '}
+              {monthLabel(rangeEnd)}.
             </DialogDescription>
           </DialogHeader>
-          <div className="py-4 text-sm text-muted-foreground space-y-2">
-            <p>Recorrentes ativas: <strong>{activeCount}</strong></p>
-            <p>Esta operação pode levar alguns segundos.</p>
-          </div>
+          <p className="text-sm text-muted-foreground">
+            Pode aplicar quantas vezes quiser: o que já foi gerado não é duplicado.
+          </p>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowApplyConfirm(false)}>Cancelar</Button>
-            <Button onClick={handleApplyAllMonths} disabled={isApplying}>
-              {isApplying ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-              Aplicar a Todos os Meses
+            <Button variant="outline" onClick={() => setConfirmRange(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={() => runApply(month, rangeEnd)} disabled={apply.isPending}>
+              {apply.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+              Aplicar
             </Button>
           </DialogFooter>
         </DialogContent>

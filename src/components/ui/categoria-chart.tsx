@@ -1,203 +1,107 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { Pie, PieChart, Bar, BarChart, CartesianGrid, XAxis, YAxis, Legend, Cell, } from 'recharts';
-import { TrendingUp, TrendingDown } from 'lucide-react';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Bar, BarChart, CartesianGrid, Cell, Legend, Pie, PieChart, XAxis, YAxis } from 'recharts';
+import { Minus, TrendingDown, TrendingUp } from 'lucide-react';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { ChartConfig, ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
+import { useMonthSummary } from '@/hooks/use-finance';
+import { addMonths, monthLabel } from '@/lib/dates';
+import { formatCents, formatCentsShort } from '@/lib/money';
+import type { MonthSummary } from '@/types/finance';
 
-import {
-  ChartConfig,
-  ChartContainer,
-  ChartTooltip,
-  ChartTooltipContent,
-} from "@/components/ui/chart";
-import { 
-  Switch 
-} from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
-import { MonthlyData,  } from '@/types/finance';
+export default function CategoryCharts({ summary }: { summary: MonthSummary }) {
+  const previousMonth = addMonths(summary.month, -1);
+  const previous = useMonthSummary(previousMonth);
 
-interface CategoryDataItem {
-  name: string;
-  value: number;
-  fill: string;
-}
-interface TrendData {
-  value: number;
-  isUp: boolean;
-}
+  const data = summary.byCategory
+    .filter((c) => c.expenseCents > 0)
+    .map((c) => ({
+      name: c.icon ? `${c.icon} ${c.name}` : c.name,
+      value: c.expenseCents / 100,
+      fill: c.color,
+    }));
 
-const COLORS: string[] = [
-  'oklch(0.488 0.243 264.376)',
-  'oklch(0.696 0.17 162.48)',
-  'oklch(0.769 0.188 70.08)',
-  'oklch(0.627 0.265 303.9)',
-  'oklch(0.645 0.246 16.439)',
-  'oklch(0.5 0.2 45)',
-  'oklch(0.7 0.15 200)',
-  'oklch(0.4 0.3 120)',
-];
+  const chartConfig: ChartConfig = Object.fromEntries(data.map((d) => [d.name, { label: d.name, color: d.fill }]));
 
-interface CategoryChartsProps {
-  data: MonthlyData;
-  allMonthsData: MonthlyData[]; 
-}
-
-export default function CategoryCharts({ data, allMonthsData }: CategoryChartsProps) {
-  const [categoryData, setCategoryData] = useState<CategoryDataItem[]>([]);
-  const [trend, setTrend] = useState<TrendData>({ value: 0, isUp: true });
-  const [showAllMonths, setShowAllMonths] = useState<boolean>(false);
-
-  const dailyBalancesKey = JSON.stringify(data?.dailyBalances);
-
-useEffect(() => {
-  if (!data) return;
-
-  const dataToProcess = showAllMonths ? allMonthsData : [data];
-  const categories: Record<string, number> = {};
-
-  dataToProcess.forEach((monthData) => {
-    monthData.dailyBalances.forEach((day) => {
-      day.dailyTransactions.forEach((transaction) => {
-        if (transaction.type === 'saída') {
-          const category = transaction.category || 'Outros';
-          categories[category] = (categories[category] || 0) + transaction.amount;
-        }
-      });
-    });
-  });
-
-  const chartData: CategoryDataItem[] = Object.keys(categories).map((category, index) => ({
-    name: category,
-    value: categories[category],
-    fill: COLORS[index % COLORS.length],
-  }));
-
-  chartData.sort((a, b) => b.value - a.value);
-  setCategoryData(chartData);
-
-  if (!showAllMonths) {
-    const randomTrend = parseFloat((Math.random() * 10 - 5).toFixed(1));
-    setTrend({ value: Math.abs(randomTrend), isUp: randomTrend > 0 });
-  }
-}, [dailyBalancesKey, showAllMonths, allMonthsData, data]);
-
-  const chartConfig: ChartConfig = categoryData.reduce((config, item) => {
-    config[item.name] = {
-      label: item.name,
-      color: item.fill
-    };
-    return config;
-  }, {} as ChartConfig);
-
-
-
+  // Variação real das despesas em relação ao mês anterior
+  const prevExpense = previous.data?.expenseCents ?? 0;
+  const change = prevExpense > 0 ? ((summary.expenseCents - prevExpense) / prevExpense) * 100 : null;
 
   return (
     <Card className="w-full mb-6 bg-card">
-     <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between pb-2 gap-2">
-        <div>
-          <CardTitle>Gastos por Categoria</CardTitle>
-          <CardDescription>
-            {showAllMonths ? 'Análise consolidada de gastos por categoria' : 'Análise de gastos por categoria neste mês'}
-          </CardDescription>
-        </div>
-        <div className="flex items-center space-x-2">
-          <Label htmlFor="show-all-months" className="text-sm">
-            {showAllMonths ? 'Todos os meses' : 'Mês atual'}
-          </Label>
-          <Switch 
-            id="show-all-months" 
-            checked={showAllMonths} 
-            onCheckedChange={setShowAllMonths}
-          />
-        </div>
+      <CardHeader className="pb-2">
+        <CardTitle>Gastos por Categoria</CardTitle>
+        <CardDescription>Despesas de {monthLabel(summary.month)}</CardDescription>
       </CardHeader>
-     <CardContent className={`flex w-full p-2 gap-4 justify-between flex-col items-center xl:flex-row ${categoryData.length > 0 ? 'xl:divide-x' : ''}`}>
 
-      
+      <CardContent
+        className={`flex w-full p-2 gap-4 justify-between flex-col items-center xl:flex-row ${data.length > 0 ? 'xl:divide-x' : ''}`}
+      >
+        {data.length > 0 ? (
+          <>
+            <ChartContainer config={chartConfig} className="h-64 2xl:h-80 w-full xl:flex-1">
+              <PieChart>
+                <Pie data={data} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius="45%">
+                  {data.map((entry) => (
+                    <Cell key={entry.name} fill={entry.fill} />
+                  ))}
+                </Pie>
+                <ChartTooltip content={<ChartTooltipContent hideLabel />} />
+                <Legend layout="horizontal" align="center" verticalAlign="bottom" />
+              </PieChart>
+            </ChartContainer>
 
-      {categoryData.length > 0 ? (
-            <ChartContainer config={chartConfig} className="h-56 sm:h-64 2xl:h-80 flex-1">
-  <PieChart>
-    <Pie
-      data={categoryData}
-      dataKey="value"
-      nameKey="name"
-      cx="50%"
-      cy="50%"
-      outerRadius="45%"  // ← porcentagem em vez de px fixo
-    >
-                 
-                    {categoryData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.fill} />
-                    ))}
-                  </Pie>
-                  <ChartTooltip
-                    content={<ChartTooltipContent nameKey="visitors" hideLabel />}
-                  />
-                  <Legend layout="horizontal" align="center" verticalAlign="bottom"  />
-                </PieChart>
-              </ChartContainer>
-            ) : (
-              <div className="   text-gray-500">
-                Nenhum gasto registrado neste período
-              </div>
-            )}
-
-{categoryData.length > 0 ? (
-         <ChartContainer config={chartConfig} className="h-52 sm:h-64 2xl:h-80 flex-1">
-  <BarChart
-    data={categoryData}
-    margin={{ top: 10, right: 10, left: 0, bottom: 5 }}  // ← menos margem
-  >
-    <CartesianGrid strokeDasharray="3 3" vertical={false} />
-    <XAxis dataKey="name" tick={{ fontSize: 11 }} />  // ← fonte menor
-    <YAxis tickFormatter={(value) => `R$${value}`} tick={{ fontSize: 11 }} width={55} />
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                  <XAxis dataKey="name" />
-                  <YAxis tickFormatter={(value) => `R$${value}`} />
-                  <ChartTooltip cursor={false} content={<ChartTooltipContent hideLabel />} />
-                  <Bar radius={8} dataKey="value">
-                    {categoryData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.fill} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ChartContainer>
-            ) : (
-              <div className=" text-gray-500">
-                Nenhum gasto registrado neste período
-              </div>
-            )}
-    
+            <ChartContainer config={chartConfig} className="h-64 2xl:h-80 w-full xl:flex-1">
+              <BarChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+                <YAxis
+                  tickFormatter={(value: number) => formatCentsShort(value * 100, false)}
+                  tick={{ fontSize: 11 }}
+                  width={60}
+                />
+                <ChartTooltip cursor={false} content={<ChartTooltipContent hideLabel />} />
+                <Bar radius={8} dataKey="value">
+                  {data.map((entry) => (
+                    <Cell key={entry.name} fill={entry.fill} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ChartContainer>
+          </>
+        ) : (
+          <div className="py-8 text-muted-foreground">Nenhum gasto registrado neste período</div>
+        )}
       </CardContent>
+
       <CardFooter className="flex-col items-start gap-2 text-sm">
-        {!showAllMonths && (
+        {change !== null && (
           <div className="flex gap-2 font-medium leading-none">
-            {trend.isUp ? (
+            {Math.abs(change) < 0.5 ? (
               <>
-                <span className="text-red-500">Tendência de aumento em {trend.value}% em relação ao mês anterior</span>
+                <span className="text-muted-foreground">Despesas estáveis em relação a {monthLabel(previousMonth)}</span>
+                <Minus className="h-4 w-4 text-muted-foreground" />
+              </>
+            ) : change > 0 ? (
+              <>
+                <span className="text-red-500">
+                  Despesas {change.toFixed(1).replace('.', ',')}% maiores que em {monthLabel(previousMonth)}
+                </span>
                 <TrendingUp className="h-4 w-4 text-red-500" />
               </>
             ) : (
               <>
-                <span className="text-green-500">Tendência de redução em {trend.value}% em relação ao mês anterior</span>
+                <span className="text-green-500">
+                  Despesas {Math.abs(change).toFixed(1).replace('.', ',')}% menores que em {monthLabel(previousMonth)}
+                </span>
                 <TrendingDown className="h-4 w-4 text-green-500" />
               </>
             )}
           </div>
         )}
         <div className="leading-none text-muted-foreground">
-          {categoryData.length > 0 
-            ? `Total de ${categoryData.length} categorias de gastos${showAllMonths ? ' em todos os meses' : ''}`
+          {data.length > 0
+            ? `${data.length} categoria(s) · total de ${formatCents(summary.expenseCents)}`
             : 'Adicione transações para ver a análise de categorias'}
         </div>
       </CardFooter>

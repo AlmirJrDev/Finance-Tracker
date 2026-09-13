@@ -1,36 +1,63 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Finance Tracker
 
-## Getting Started
+Controle financeiro pessoal: entradas e saídas, categorias, recorrências, limites por categoria e visão anual.
 
-First, run the development server:
+Next.js 16 + React 19 + Tailwind 4 + shadcn/ui, com TanStack Query e react-hook-form. Os dados ficam na [API](https://github.com/AlmirJrDev/finance-tracker-backend).
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+## Rodando localmente
+
+1. Suba a API (no repositório do backend):
+
+   ```bash
+   npm run dev:memory
+   ```
+
+2. Configure e suba o front:
+
+   ```bash
+   cp .env.example .env.local   # preencha NEXTAUTH_SECRET; para testar sem Google use NEXT_PUBLIC_DEV_LOGIN=true
+   npm install
+   npm run dev
+   ```
+
+Com `NEXT_PUBLIC_DEV_LOGIN=true` aparece o botão **Entrar (dev)** na tela de login, que usa o login de desenvolvimento da API. Ele nunca é ativado em produção.
+
+## Scripts
+
+| Script | O que faz |
+| --- | --- |
+| `npm run dev` | Servidor de desenvolvimento |
+| `npm run build` | Build de produção |
+| `npm run lint` | ESLint |
+| `npm run typecheck` | Checagem de tipos |
+| `npm test` | Testes unitários (Vitest) |
+
+## Como a autenticação funciona
+
+1. O usuário entra com Google pelo NextAuth.
+2. No callback `jwt` (servidor), o `id_token` do Google é trocado **uma vez** por um token da API (`POST /api/auth/google`), válido por 30 dias.
+3. O token fica dentro da sessão criptografada do NextAuth, não no `localStorage`.
+4. Se a API responder 401, o app mostra "sessão expirada" e faz logout.
+
+## Organização
+
+```
+src/
+  app/                  rotas do Next (página e NextAuth)
+  components/
+    dashboard.tsx       tela principal
+    login-screen.tsx
+    forms/              formulários (transação, seletor de categoria)
+    ui/                 componentes de tela e shadcn/ui
+  hooks/use-finance.ts  queries e mutations (TanStack Query)
+  lib/
+    api.ts              cliente HTTP tipado
+    auth.ts             configuração do NextAuth
+    money.ts            centavos <-> reais
+    dates.ts            datas "YYYY-MM-DD" sem problemas de fuso
+  types/finance.ts      contratos da API
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Valores trafegam sempre em **centavos** e datas como **texto `YYYY-MM-DD`**.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
-
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Os limites por categoria e o controle de gastos variáveis ainda ficam no navegador (`localStorage`). Levá-los para a API está no plano da Fase 2.

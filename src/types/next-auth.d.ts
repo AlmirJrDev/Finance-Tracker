@@ -1,13 +1,24 @@
+import type { DefaultSession } from 'next-auth';
+
+type AuthError = 'BackendAuthError' | 'BackendTokenExpired';
+
 declare module 'next-auth' {
   interface Session {
-    accessToken?: string
-    idToken?: string
+    user: DefaultSession['user'];
+    backendToken?: string;
+    error?: AuthError;
+  }
+
+  interface User {
+    backendToken?: string;
+    backendTokenExpiresAt?: string;
   }
 }
 
 declare module 'next-auth/jwt' {
   interface JWT {
-    accessToken?: string
-    idToken?: string
+    backendToken?: string;
+    backendTokenExpiresAt?: string;
+    error?: AuthError;
   }
 }

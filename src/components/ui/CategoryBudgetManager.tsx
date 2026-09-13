@@ -1,173 +1,124 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
+import { AlertCircle, Edit, PlusCircle, Trash2 } from 'lucide-react';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Progress } from '@/components/ui/progress';
-import { AlertCircle, Edit, Trash2, PlusCircle } from 'lucide-react';
-import { MonthlyData } from '@/types/finance';
-import api from '@/lib/api';
+import { useCategories } from '@/hooks/use-finance';
+import { centsToInput, formatCents, parseAmountToCents } from '@/lib/money';
+import type { Category, MonthSummary } from '@/types/finance';
 
+// Ainda salvo no navegador. Na Fase 2 os orçamentos vão para a API.
+type Budget = { categoryId: string; limitCents: number };
 
-interface CategoryBudget {
-  category: string;
-  limit: number;
+const STORAGE_KEY = 'categoryBudgets:v2';
+const LEGACY_KEY = 'categoryBudgetLimits'; // [{ category: nome, limit: reais }]
+
+function loadBudgets(categories: Category[]): Budget[] {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored) return JSON.parse(stored);
+
+    // Converte o formato antigo (por nome) para o novo (por ID), sem perder o que já existia
+    const legacy = localStorage.getItem(LEGACY_KEY);
+    if (!legacy) return [];
+    const byName = new Map(categories.map((c) => [c.name.toLowerCase(), c.id]));
+    const migrated = (JSON.parse(legacy) as { category: string; limit: number }[])
+      .map((b) => ({ categoryId: byName.get(b.category.toLowerCase()), limitCents: Math.round(b.limit * 100) }))
+      .filter((b): b is Budget => Boolean(b.categoryId));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(migrated));
+    return migrated;
+  } catch {
+    return [];
+  }
 }
 
-const loadBudgetLimits = (): CategoryBudget[] => {
-  if (typeof window === 'undefined') return [];
-  const stored = localStorage.getItem('categoryBudgetLimits');
-  return stored ? JSON.parse(stored) : [];
-};
+export default function CategoryBudgetManager({ summary }: { summary: MonthSummary }) {
+  const { data: categories = [] } = useCategories();
+  const [budgets, setBudgets] = useState<Budget[] | null>(null);
+  const [categoryId, setCategoryId] = useState('');
+  const [limit, setLimit] = useState('');
+  const [editing, setEditing] = useState(false);
 
-const saveBudgetLimits = (limits: CategoryBudget[]) => {
-  localStorage.setItem('categoryBudgetLimits', JSON.stringify(limits));
-};
+  // Carrega uma vez, assim que as categorias chegarem (necessárias para converter o formato antigo)
+  if (budgets === null && categories.length > 0) setBudgets(loadBudgets(categories));
 
-interface CategoryBudgetManagerProps {
-  data: MonthlyData;
-  allMonthsData: MonthlyData[];
-}
+  const persist = (next: Budget[]) => {
+    setBudgets(next);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+  };
 
-export default function CategoryBudgetManager({ data }: CategoryBudgetManagerProps) {
-  const [budgetLimits, setBudgetLimits] = useState<CategoryBudget[]>([]);
-  const [selectedCategory, setSelectedCategory] = useState<string>('');
-  const [budgetLimit, setBudgetLimit] = useState<string>('');
-  const [availableCategories, setAvailableCategories] = useState<{ id: string; name: string }[]>([]);
-  const [isEditing, setIsEditing] = useState<number | null>(null);
-  const [categorySpending, setCategorySpending] = useState<Record<string, number>>({});
+  const spentBy = new Map(summary.byCategory.map((c) => [c.categoryId, c.expenseCents]));
+  const categoryById = new Map(categories.map((c) => [c.id, c]));
+  const list = (budgets ?? []).filter((b) => categoryById.has(b.categoryId));
 
-  // Carrega categorias da API
-  useEffect(() => {
-    api.getCategories()
-      .then((res) => setAvailableCategories(res.data.map((c: any) => ({ id: c._id, name: c.name }))))
-      .catch(() => setAvailableCategories([]));
-
-    setBudgetLimits(loadBudgetLimits());
-  }, []);
-
-  // Calcula gastos por categoria com base nos dados do mês
-  useEffect(() => {
-    if (!data) return;
-
-    const spending: Record<string, number> = {};
-
-    data.dailyBalances.forEach((day) => {
-      day.dailyTransactions.forEach((transaction) => {
-        if (transaction.type === 'saída' && transaction.category) {
-          const key = transaction.category.toLowerCase();
-          spending[key] = (spending[key] || 0) + transaction.amount;
-        }
-      });
-    });
-
-    setCategorySpending(spending);
-  }, [data]);
-
-  const handleSaveBudget = () => {
-    if (!selectedCategory || !budgetLimit || isNaN(Number(budgetLimit)) || Number(budgetLimit) <= 0) {
-      alert('Por favor, selecione uma categoria e insira um valor válido.');
+  const handleSave = () => {
+    const limitCents = parseAmountToCents(limit);
+    if (!categoryId || !limitCents) {
+      toast.error('Selecione uma categoria e informe um valor válido.');
       return;
     }
-
-    const existingIndex = budgetLimits.findIndex((item) => item.category === selectedCategory);
-    let newLimits: CategoryBudget[];
-
-    if (isEditing !== null) {
-      newLimits = [...budgetLimits];
-      newLimits[isEditing] = { category: selectedCategory, limit: Number(budgetLimit) };
-    } else if (existingIndex >= 0) {
-      if (!confirm(`Já existe um limite para "${selectedCategory}". Deseja atualizá-lo?`)) return;
-      newLimits = [...budgetLimits];
-      newLimits[existingIndex].limit = Number(budgetLimit);
-    } else {
-      newLimits = [...budgetLimits, { category: selectedCategory, limit: Number(budgetLimit) }];
-    }
-
-    setBudgetLimits(newLimits);
-    saveBudgetLimits(newLimits);
+    persist([...list.filter((b) => b.categoryId !== categoryId), { categoryId, limitCents }]);
     resetForm();
   };
 
-  const handleEdit = (index: number) => {
-    const budget = budgetLimits[index];
-    setSelectedCategory(budget.category);
-    setBudgetLimit(budget.limit.toString());
-    setIsEditing(index);
-  };
-
-  const handleDelete = (index: number) => {
-    const categoryToDelete = budgetLimits[index].category;
-    if (confirm(`Tem certeza que deseja remover o limite para "${categoryToDelete}"?`)) {
-      const newLimits = budgetLimits.filter((_, i) => i !== index);
-      setBudgetLimits(newLimits);
-      saveBudgetLimits(newLimits);
-    }
-  };
-
   const resetForm = () => {
-    setSelectedCategory('');
-    setBudgetLimit('');
-    setIsEditing(null);
+    setCategoryId('');
+    setLimit('');
+    setEditing(false);
   };
 
-  const filteredCategories = isEditing !== null
-    ? availableCategories
-    : availableCategories.filter((cat) => !budgetLimits.some((b) => b.category === cat.name));
-
-  const getSpent = (categoryName: string) =>
-    categorySpending[categoryName.toLowerCase()] || 0;
-
-  const getProgress = (categoryName: string, limit: number) =>
-    Math.min((getSpent(categoryName) / limit) * 100, 100);
-
-  const isOverBudget = (categoryName: string, limit: number) =>
-    getSpent(categoryName) > limit;
+  const available = editing ? categories : categories.filter((c) => !list.some((b) => b.categoryId === c.id));
 
   return (
     <Card className="w-full mb-6">
       <CardHeader>
         <CardTitle>Limites de Gastos por Categoria</CardTitle>
-        <CardDescription>Defina limites orçamentários para suas categorias de despesas</CardDescription>
+        <CardDescription>Defina limites mensais para suas categorias de despesas</CardDescription>
       </CardHeader>
       <CardContent>
         <div className="flex flex-col gap-2 mb-6 md:flex-row">
           <select
+            aria-label="Categoria"
             className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
-            value={selectedCategory}
-            onChange={(e) => setSelectedCategory(e.target.value)}
+            value={categoryId}
+            disabled={editing}
+            onChange={(e) => setCategoryId(e.target.value)}
           >
             <option value="">Selecione uma categoria</option>
-            {filteredCategories.map((cat) => (
-              <option key={cat.id} value={cat.name}>
+            {available.map((cat) => (
+              <option key={cat.id} value={cat.id}>
                 {cat.name}
               </option>
             ))}
           </select>
 
           <Input
-            type="number"
-            placeholder="Valor limite"
-            value={budgetLimit}
-            onChange={(e) => setBudgetLimit(e.target.value)}
+            inputMode="decimal"
+            placeholder="Limite (ex.: 800,00)"
+            aria-label="Valor limite"
+            value={limit}
+            onChange={(e) => setLimit(e.target.value)}
             className="w-full"
-            min="0"
-            step="0.01"
           />
 
-          <Button onClick={handleSaveBudget} className="flex items-center gap-1 whitespace-nowrap">
+          <Button onClick={handleSave} className="flex items-center gap-1 whitespace-nowrap">
             <PlusCircle className="h-4 w-4" />
-            {isEditing !== null ? 'Atualizar' : 'Adicionar'} Limite
+            {editing ? 'Atualizar' : 'Adicionar'} Limite
           </Button>
 
-          {isEditing !== null && (
-            <Button variant="outline" onClick={resetForm}>Cancelar</Button>
+          {editing && (
+            <Button variant="outline" onClick={resetForm}>
+              Cancelar
+            </Button>
           )}
         </div>
 
-        {budgetLimits.length > 0 ? (
+        {list.length > 0 ? (
           <Table>
             <TableHeader>
               <TableRow>
@@ -179,31 +130,53 @@ export default function CategoryBudgetManager({ data }: CategoryBudgetManagerPro
               </TableRow>
             </TableHeader>
             <TableBody>
-              {budgetLimits.map((budget, index) => {
-                const spent = getSpent(budget.category);
-                const progress = getProgress(budget.category, budget.limit);
-                const over = isOverBudget(budget.category, budget.limit);
+              {list.map((budget) => {
+                const category = categoryById.get(budget.categoryId)!;
+                const spent = spentBy.get(budget.categoryId) ?? 0;
+                const progress = Math.min((spent / budget.limitCents) * 100, 100);
+                const over = spent > budget.limitCents;
 
                 return (
-                  <TableRow key={index}>
-                    <TableCell>{budget.category}</TableCell>
-                    <TableCell>R$ {budget.limit.toFixed(2)}</TableCell>
+                  <TableRow key={budget.categoryId}>
+                    <TableCell>
+                      {category.icon} {category.name}
+                    </TableCell>
+                    <TableCell>{formatCents(budget.limitCents)}</TableCell>
                     <TableCell className={over ? 'text-red-500 font-bold' : ''}>
-                      R$ {spent.toFixed(2)}
-                      {over && <AlertCircle className="inline ml-2 h-4 w-4" />}
+                      {formatCents(spent)}
+                      {over && <AlertCircle className="inline ml-2 h-4 w-4" aria-label="Acima do limite" />}
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <Progress value={progress} className={`w-full ${over ? 'bg-red-200' : 'bg-slate-200'}`} />
-                        <span className="text-xs whitespace-nowrap">{progress.toFixed(0)}%</span>
+                        <span className="text-xs whitespace-nowrap">{Math.round((spent / budget.limitCents) * 100)}%</span>
                       </div>
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
-                        <Button variant="ghost" size="icon" onClick={() => handleEdit(index)}>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          aria-label="Editar limite"
+                          onClick={() => {
+                            setCategoryId(budget.categoryId);
+                            setLimit(centsToInput(budget.limitCents));
+                            setEditing(true);
+                          }}
+                        >
                           <Edit className="h-4 w-4" />
                         </Button>
-                        <Button variant="ghost" size="icon" onClick={() => handleDelete(index)} className="text-red-600">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          aria-label="Remover limite"
+                          className="text-red-600"
+                          onClick={() => {
+                            if (confirm(`Remover o limite de "${category.name}"?`)) {
+                              persist(list.filter((b) => b.categoryId !== budget.categoryId));
+                            }
+                          }}
+                        >
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
@@ -215,7 +188,7 @@ export default function CategoryBudgetManager({ data }: CategoryBudgetManagerPro
           </Table>
         ) : (
           <div className="text-center py-8 text-muted-foreground">
-            Nenhum limite orçamentário definido. Adicione seu primeiro limite acima.
+            Nenhum limite definido. Adicione seu primeiro limite acima.
           </div>
         )}
       </CardContent>

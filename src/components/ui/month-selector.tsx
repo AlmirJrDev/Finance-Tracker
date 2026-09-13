@@ -1,59 +1,57 @@
 'use client';
 
+import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { MONTHS } from '@/lib/data';
+import { addMonths, currentMonthStr, monthLabel } from '@/lib/dates';
+import type { ActiveMonth } from '@/types/finance';
 
-interface MonthSelectorProps {
-  currentMonth: number;
-  currentYear: number;
-  onMonthChange: (month: number, year: number) => void;
-}
+type Props = {
+  month: string;
+  onChange: (month: string) => void;
+  activeMonths: ActiveMonth[];
+};
 
-export function MonthSelector({ 
-  currentMonth, 
-  currentYear, 
-  onMonthChange 
-}: MonthSelectorProps) {
-  const allMonths: { month: number, year: number, label: string, value: string }[] = [];
-  
-  for (let month = 0; month < 12; month++) {
-    allMonths.push({
-      month,
-      year: 2025,
-      label: `${MONTHS[month]} 2025`,
-      value: `2025-${month}`
-    });
-  }
-  
-  for (let month = 0; month < 12; month++) {
-    allMonths.push({
-      month,
-      year: 2026,
-      label: `${MONTHS[month]} 2026`,
-      value: `2026-${month}`
-    });
-  }
+export function MonthSelector({ month, onChange, activeMonths }: Props) {
+  // Do mês mais antigo com dados (ou 12 meses atrás) até 12 meses à frente
+  const current = currentMonthStr();
+  const oldest = activeMonths.at(-1)?.month;
+  let start = addMonths(current, -12);
+  if (oldest && oldest < start) start = oldest;
+  if (month < start) start = month;
+  let end = addMonths(current, 12);
+  if (month > end) end = month;
+
+  const withData = new Map(activeMonths.map((m) => [m.month, m.transactionCount]));
+  const options: string[] = [];
+  for (let m = end; m >= start; m = addMonths(m, -1)) options.push(m);
 
   return (
-
-        <Select 
-          value={`${currentYear}-${currentMonth}`}
-          onValueChange={(value) => {
-            const [year, month] = value.split('-').map(Number);
-            onMonthChange(month, year);
-          }}
-        >
-          <SelectTrigger>
-            <SelectValue placeholder="Selecione o mês" />
-          </SelectTrigger>
-          <SelectContent>
-            {allMonths.map((option) => (
-              <SelectItem key={option.value} value={option.value}>
-                {option.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
- 
+    <div className="flex items-center gap-1">
+      <Button variant="outline" size="icon" onClick={() => onChange(addMonths(month, -1))} aria-label="Mês anterior">
+        <ChevronLeft className="h-4 w-4" />
+      </Button>
+      <Select value={month} onValueChange={onChange}>
+        <SelectTrigger className="w-56">
+          <SelectValue placeholder="Selecione o mês" />
+        </SelectTrigger>
+        <SelectContent position="popper" className="max-h-72">
+          {options.map((m) => (
+            <SelectItem key={m} value={m}>
+              <span className="flex w-full items-center justify-between gap-3">
+                <span>
+                  {monthLabel(m)}
+                  {m === current ? ' (atual)' : ''}
+                </span>
+                {withData.has(m) && <span className="text-xs text-muted-foreground">{withData.get(m)}</span>}
+              </span>
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      <Button variant="outline" size="icon" onClick={() => onChange(addMonths(month, 1))} aria-label="Próximo mês">
+        <ChevronRight className="h-4 w-4" />
+      </Button>
+    </div>
   );
 }

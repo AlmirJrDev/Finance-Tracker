@@ -1,199 +1,205 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
+import { Check, Edit, Loader2, Plus, Trash2, X } from 'lucide-react';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
-import { Plus, Edit, Trash2, Loader2, X } from 'lucide-react';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ScrollArea } from './scroll-area';
-import { toast } from 'sonner';
-import api from '@/lib/api';
+import { useCategories, useCategoryMutations } from '@/hooks/use-finance';
+import type { Category } from '@/types/finance';
 
+type Draft = { name: string; icon: string; color: string };
 
-type ApiCategory = {
-  _id: string;
-  name: string;
-  isDefault: boolean;
-  color?: string;
-  icon?: string;
-};
+const toDraft = (c?: Category): Draft => ({ name: c?.name ?? '', icon: c?.icon ?? '', color: c?.color ?? '#6B7280' });
 
-type CategoryManagerProps = {
-  isOpen: boolean;
-  onClose: () => void;
-};
-
-export default function CategoryManager({ isOpen, onClose }: CategoryManagerProps) {
-  const [categories, setCategories] = useState<ApiCategory[]>([]);
-  const [newCategory, setNewCategory] = useState('');
+export default function CategoryManager({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
+  const { data: categories = [], isLoading } = useCategories();
+  const { create, update, remove } = useCategoryMutations();
+  const [draft, setDraft] = useState<Draft>(toDraft());
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [editingValue, setEditingValue] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
+  const [editDraft, setEditDraft] = useState<Draft>(toDraft());
 
-  useEffect(() => {
-    if (!isOpen) return;
-    setIsLoading(true);
-    api.getCategories()
-      .then((res) => setCategories(res.data))
-      .catch((err) => toast.error('Erro ao carregar categorias: ' + err.message))
-      .finally(() => setIsLoading(false));
-  }, [isOpen]);
+  const fail = (action: string) => (err: unknown) => toast.error(`Erro ao ${action}`, { description: (err as Error).message });
 
-  const handleAddCategory = async () => {
-    if (!newCategory.trim()) return;
-    if (categories.some((c) => c.name.toLowerCase() === newCategory.trim().toLowerCase())) {
-      toast.error('Já existe uma categoria com esse nome.');
-      return;
-    }
+  const handleCreate = async () => {
+    if (draft.name.trim().length < 2) return;
     try {
-      const res = await api.createCategory({ name: newCategory.trim() });
-      setCategories((prev) => [...prev, res.data]);
-      setNewCategory('');
+      await create.mutateAsync({ name: draft.name.trim(), icon: draft.icon.trim() || null, color: draft.color });
+      setDraft(toDraft());
       toast.success('Categoria criada.');
-    } catch (err: any) {
-      toast.error('Erro ao criar categoria: ' + err.message);
+    } catch (err) {
+      fail('criar categoria')(err);
     }
   };
 
-  const handleStartEdit = (cat: ApiCategory) => {
-    setEditingId(cat._id);
-    setEditingValue(cat.name);
-  };
-
-  const handleUpdateCategory = async (id: string) => {
-    if (!editingValue.trim()) return;
+  const handleUpdate = async (id: string) => {
+    if (editDraft.name.trim().length < 2) return;
     try {
-      const res = await api.updateCategory(id, { name: editingValue.trim() });
-      setCategories((prev) => prev.map((c) => c._id === id ? res.data : c));
+      await update.mutateAsync({ id, name: editDraft.name.trim(), icon: editDraft.icon.trim() || null, color: editDraft.color });
       setEditingId(null);
-      toast.success('Categoria atualizada.');
-    } catch (err: any) {
-      toast.error('Erro ao atualizar categoria: ' + err.message);
+      toast.success('Categoria atualizada em todas as transações.');
+    } catch (err) {
+      fail('atualizar categoria')(err);
     }
   };
 
-  const handleDeleteCategory = async (cat: ApiCategory) => {
-    if (cat.isDefault) {
-      toast.error('Não é possível excluir categorias padrão do sistema.');
-      return;
-    }
-    if (!confirm(`Tem certeza que deseja excluir "${cat.name}"? Transações serão movidas para "Outros".`)) return;
+  const handleDelete = async (cat: Category) => {
+    if (!confirm(`Excluir "${cat.name}"? As transações serão movidas para "Outros".`)) return;
     try {
-      await api.deleteCategory(cat._id);
-      setCategories((prev) => prev.filter((c) => c._id !== cat._id));
-      toast.success('Categoria removida.');
-    } catch (err: any) {
-      toast.error('Erro ao excluir categoria: ' + err.message);
+      const result = await remove.mutateAsync(cat.id);
+      toast.success('Categoria removida.', {
+        description: result.movedCount ? `${result.movedCount} transação(ões) movida(s) para Outros.` : undefined,
+      });
+    } catch (err) {
+      fail('excluir categoria')(err);
     }
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-<DialogContent className="max-w-3xl flex flex-col max-h-[90vh] p-4 gap-0">
-   <DialogHeader className="flex flex-row items-start justify-between space-y-0 pb-2">
-  <div>
-    <DialogTitle>Gerenciar Categorias</DialogTitle>
-    <DialogDescription>Adicione ou altere uma categoria</DialogDescription>
-  </div>
-  <Button variant="ghost" size="icon" onClick={onClose} className="h-8 w-8 flex-shrink-0">
-    <X className="h-4 w-4" />
-  </Button>
-</DialogHeader>
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-3xl flex flex-col max-h-[90vh] p-4 gap-0">
+        <DialogHeader className="pb-3">
+          <DialogTitle>Gerenciar Categorias</DialogTitle>
+          <DialogDescription>
+            Renomear uma categoria atualiza todo o histórico. Categorias padrão podem ser personalizadas, mas não excluídas.
+          </DialogDescription>
+        </DialogHeader>
 
-        <div className="flex gap-2 mb-4">
+        <form
+          className="flex gap-2 mb-4"
+          onSubmit={(e) => {
+            e.preventDefault();
+            handleCreate();
+          }}
+        >
           <Input
-            placeholder="Nova categoria"
-            value={newCategory}
-            onChange={(e) => setNewCategory(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && handleAddCategory()}
+            aria-label="Ícone"
+            className="w-14 text-center"
+            placeholder="🙂"
+            value={draft.icon}
+            onChange={(e) => setDraft({ ...draft, icon: e.target.value })}
           />
-          <Button onClick={handleAddCategory} className="flex items-center gap-1">
+          <Input
+            aria-label="Nome da nova categoria"
+            placeholder="Nova categoria"
+            value={draft.name}
+            onChange={(e) => setDraft({ ...draft, name: e.target.value })}
+          />
+          <input
+            aria-label="Cor"
+            type="color"
+            className="h-9 w-10 cursor-pointer rounded border bg-transparent"
+            value={draft.color}
+            onChange={(e) => setDraft({ ...draft, color: e.target.value })}
+          />
+          <Button type="submit" disabled={create.isPending} className="flex items-center gap-1">
             <Plus className="h-4 w-4" /> Adicionar
           </Button>
-        </div>
+        </form>
 
         <ScrollArea className="flex-grow overflow-y-auto pr-3">
-          <Card className="border shadow-sm">
-            <CardHeader className="py-3">
-              <CardTitle>Suas Categorias</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {isLoading ? (
-                <div className="flex justify-center py-8">
-                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-                </div>
-              ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Nome</TableHead>
-                      <TableHead>Tipo</TableHead>
-                      <TableHead className="text-right">Ações</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {categories.map((cat) => (
-                      <TableRow key={cat._id}>
-                        <TableCell>
-                          {editingId === cat._id ? (
-                            <Input
-                              value={editingValue}
-                              onChange={(e) => setEditingValue(e.target.value)}
-                              onBlur={() => handleUpdateCategory(cat._id)}
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter') handleUpdateCategory(cat._id);
-                                if (e.key === 'Escape') setEditingId(null);
-                              }}
-                              autoFocus
-                            />
-                          ) : (
-                            <span className="flex items-center gap-2">
-                              {cat.icon && <span>{cat.icon}</span>}
-                              {cat.name}
-                            </span>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={cat.isDefault ? 'secondary' : 'default'}>
-                            {cat.isDefault ? 'Padrão' : 'Personalizada'}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex justify-end gap-2">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => handleStartEdit(cat)}
-                              disabled={cat.isDefault}
-                            >
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => handleDeleteCategory(cat)}
-                              disabled={cat.isDefault}
-                              className="text-red-600"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              )}
-            </CardContent>
-          </Card>
+          {isLoading ? (
+            <div className="flex justify-center py-8">
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Nome</TableHead>
+                  <TableHead>Tipo</TableHead>
+                  <TableHead className="text-right">Ações</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {categories.map((cat) => (
+                  <TableRow key={cat.id}>
+                    <TableCell>
+                      {editingId === cat.id ? (
+                        <form
+                          className="flex gap-2"
+                          onSubmit={(e) => {
+                            e.preventDefault();
+                            handleUpdate(cat.id);
+                          }}
+                        >
+                          <Input
+                            aria-label="Ícone"
+                            className="w-14 text-center"
+                            value={editDraft.icon}
+                            onChange={(e) => setEditDraft({ ...editDraft, icon: e.target.value })}
+                          />
+                          <Input
+                            aria-label="Nome"
+                            autoFocus
+                            value={editDraft.name}
+                            onChange={(e) => setEditDraft({ ...editDraft, name: e.target.value })}
+                            onKeyDown={(e) => e.key === 'Escape' && setEditingId(null)}
+                          />
+                          <input
+                            aria-label="Cor"
+                            type="color"
+                            className="h-9 w-10 cursor-pointer rounded border bg-transparent"
+                            value={editDraft.color}
+                            onChange={(e) => setEditDraft({ ...editDraft, color: e.target.value })}
+                          />
+                          <Button type="submit" size="icon" variant="ghost" aria-label="Salvar" disabled={update.isPending}>
+                            <Check className="h-4 w-4" />
+                          </Button>
+                          <Button type="button" size="icon" variant="ghost" aria-label="Cancelar" onClick={() => setEditingId(null)}>
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </form>
+                      ) : (
+                        <span className="flex items-center gap-2">
+                          <span className="h-3 w-3 rounded-full" style={{ background: cat.color }} aria-hidden />
+                          {cat.icon && <span>{cat.icon}</span>}
+                          {cat.name}
+                        </span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={cat.isDefault ? 'secondary' : 'default'}>{cat.isDefault ? 'Padrão' : 'Personalizada'}</Badge>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-2">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          aria-label={`Editar ${cat.name}`}
+                          onClick={() => {
+                            setEditingId(cat.id);
+                            setEditDraft(toDraft(cat));
+                          }}
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          aria-label={`Excluir ${cat.name}`}
+                          onClick={() => handleDelete(cat)}
+                          disabled={cat.isDefault}
+                          className="text-red-600"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
         </ScrollArea>
 
-<DialogFooter className="pt-3 border-t mt-2 flex-shrink-0">
-  <Button onClick={onClose}>Fechar</Button>
-</DialogFooter>
+        <DialogFooter className="pt-3 border-t mt-2 flex-shrink-0">
+          <Button onClick={() => onOpenChange(false)}>Fechar</Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
