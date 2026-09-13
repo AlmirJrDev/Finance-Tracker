@@ -30,6 +30,26 @@ export function daysInMonth(ym: string): number {
   return new Date(year, month, 0).getDate();
 }
 
+export function addDays(date: string, n: number): string {
+  const [y, m, d] = date.split('-').map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d + n));
+  return `${dt.getUTCFullYear()}-${pad(dt.getUTCMonth() + 1)}-${pad(dt.getUTCDate())}`;
+}
+
+/** Mesmo dia n meses depois, limitado ao fim do mês (31/01 + 1 → 28/02). */
+export function addMonthsToDate(date: string, n: number): string {
+  return sameDayInMonth(addMonths(date.slice(0, 7), n), Number(date.slice(8, 10)));
+}
+
+/** Quantos dias de a até b (b − a). */
+export function daysBetween(a: string, b: string): number {
+  const toUtc = (s: string) => {
+    const [y, m, d] = s.split('-').map(Number);
+    return Date.UTC(y, m - 1, d);
+  };
+  return Math.round((toUtc(b) - toUtc(a)) / 86_400_000);
+}
+
 /** Hoje no fuso do navegador. */
 export function todayStr(): string {
   const now = new Date();

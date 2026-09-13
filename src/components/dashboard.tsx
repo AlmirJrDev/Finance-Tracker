@@ -19,7 +19,9 @@ import TransactionForm from '@/components/forms/transaction-form';
 import { ModeToggle } from '@/components/ui/themeSwitcher';
 import { TutorialGuide } from '@/components/ui/tutorialGuide';
 import { UserAvatarPopover } from '@/components/ui/user';
-import { useActiveMonths, useDeleteTransaction, useMonthSummary, useMonthTransactions } from '@/hooks/use-finance';
+import { DeleteTransactionDialog } from '@/components/forms/delete-transaction-dialog';
+import { ProjectionPanel } from '@/components/projection-panel';
+import { useActiveMonths, useMonthSummary, useMonthTransactions, useSetTransactionStatus } from '@/hooks/use-finance';
 import { currentMonthStr, monthLabel } from '@/lib/dates';
 import type { Transaction } from '@/types/finance';
 
@@ -32,10 +34,12 @@ export function Dashboard() {
   const [editing, setEditing] = useState<Transaction | null>(null);
   const [categoriesOpen, setCategoriesOpen] = useState(false);
 
+  const [deleting, setDeleting] = useState<Transaction | null>(null);
+
   const summary = useMonthSummary(month);
   const transactions = useMonthTransactions(month);
   const activeMonths = useActiveMonths();
-  const deleteTransaction = useDeleteTransaction();
+  const setStatus = useSetTransactionStatus();
 
   // Se o mês atual está vazio, abre no mês mais recente com movimento (uma única vez)
   const [checkedLatest, setCheckedLatest] = useState(false);
@@ -56,13 +60,16 @@ export function Dashboard() {
     setFormOpen(true);
   };
 
-  const handleDelete = async (t: Transaction) => {
-    if (!confirm(`Excluir "${t.description}"?`)) return;
+  const handleToggleStatus = async (t: Transaction) => {
+    const status = t.status === 'paid' ? 'pending' : 'paid';
     try {
-      await deleteTransaction.mutateAsync(t.id);
-      toast.success('Transação excluída.');
+      await setStatus.mutateAsync({ ids: [t.id], status });
+      toast.success(
+        status === 'paid' ? `Marcado como ${t.type === 'income' ? 'recebido' : 'pago'}.` : 'Marcado como pendente.',
+        { description: t.description }
+      );
     } catch (err) {
-      toast.error('Erro ao excluir', { description: (err as Error).message });
+      toast.error('Erro ao atualizar', { description: (err as Error).message });
     }
   };
 
@@ -148,6 +155,7 @@ export function Dashboard() {
           </div>
         ) : (
           <div className={summary.isPlaceholderData || transactions.isPlaceholderData ? 'opacity-60 transition-opacity' : ''}>
+            <ProjectionPanel />
             <MonthlySummary summary={summary.data} />
             {isEmpty ? (
               <Card className="text-center p-8 rounded-md flex flex-col justify-center items-center gap-4 mb-6">
@@ -160,7 +168,7 @@ export function Dashboard() {
             ) : (
               <>
                 <CategoryCharts summary={summary.data} />
-                <CategoryBudgetManager summary={summary.data} />
+                <CategoryBudgetManager month={month} />
                 <DailyAllowance key={`${month}:${summary.data.resultCents}`} summary={summary.data} />
                 <RecurringExpenseTracker key={month} month={month} />
               </>
@@ -169,7 +177,8 @@ export function Dashboard() {
               summary={summary.data}
               transactions={transactions.data}
               onEdit={openEdit}
-              onDelete={handleDelete}
+              onDelete={setDeleting}
+              onToggleStatus={handleToggleStatus}
             />
           </div>
         ))}
@@ -188,6 +197,8 @@ export function Dashboard() {
           if (view === 'month' && savedMonth !== month) setMonth(savedMonth);
         }}
       />
+
+      <DeleteTransactionDialog transaction={deleting} onClose={() => setDeleting(null)} />
 
       <CategoryManager open={categoriesOpen} onOpenChange={setCategoriesOpen} />
     </div>

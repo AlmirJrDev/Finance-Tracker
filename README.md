@@ -1,6 +1,6 @@
 # Finance Tracker
 
-Controle financeiro pessoal: entradas e saídas, categorias, recorrências, limites por categoria e visão anual.
+Controle financeiro pessoal: entradas e saídas com status pago/pendente, projeção de saldo, compras parceladas, recorrências automáticas, limites por categoria com alertas e visão anual.
 
 Next.js 16 + React 19 + Tailwind 4 + shadcn/ui, com TanStack Query e react-hook-form. Os dados ficam na [API](https://github.com/AlmirJrDev/finance-tracker-backend).
 
@@ -60,4 +60,4 @@ src/
 
 Valores trafegam sempre em **centavos** e datas como **texto `YYYY-MM-DD`**.
 
-Os limites por categoria e o controle de gastos variáveis ainda ficam no navegador (`localStorage`). Levá-los para a API está no plano da Fase 2.
+Os limites por categoria ficam na API (os que estavam no navegador são importados automaticamente). O controle de gastos variáveis ainda é local (`localStorage`).

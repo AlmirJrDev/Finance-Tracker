@@ -14,6 +14,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { CategorySelect } from '@/components/forms/category-select';
@@ -35,6 +36,7 @@ const schema = z
     startDate: z.string().min(1, 'Informe a data de início'),
     endDate: z.string(),
     note: z.string().max(500),
+    autoConfirm: z.boolean(),
   })
   .superRefine((v, ctx) => {
     const day = Number(v.dayOfMonth);
@@ -61,6 +63,7 @@ function defaults(item: RecurringTransaction | null): FormValues {
     startDate: item?.startDate ?? `${todayStr().slice(0, 7)}-01`,
     endDate: item?.endDate ?? '',
     note: item?.note ?? '',
+    autoConfirm: item?.autoConfirm ?? false,
   };
 }
 
@@ -69,7 +72,7 @@ function describeSchedule(r: RecurringTransaction) {
     r.frequency === 'monthly'
       ? `Todo dia ${r.dayOfMonth}`
       : r.frequency === 'weekly'
-        ? `Toda ${WEEKDAYS[r.dayOfWeek ?? 0].toLowerCase()}`
+        ? `${r.dayOfWeek === 0 || r.dayOfWeek === 6 ? 'Todo' : 'Toda'} ${WEEKDAYS[r.dayOfWeek ?? 0].toLowerCase()}`
         : 'Todos os dias';
   return r.endDate ? `${base} até ${formatDate(r.endDate)}` : base;
 }
@@ -105,6 +108,7 @@ export default function RecurringTransactions({ month }: { month: string }) {
           dayOfMonth: v.frequency === 'monthly' ? Number(v.dayOfMonth) : null,
           dayOfWeek: v.frequency === 'weekly' ? Number(v.dayOfWeek) : null,
           isActive: editing?.isActive ?? true,
+          autoConfirm: v.autoConfirm,
           startDate: v.startDate,
           endDate: v.endDate || null,
           note: v.note.trim() || null,
@@ -112,7 +116,7 @@ export default function RecurringTransactions({ month }: { month: string }) {
       });
       playNotificationSound();
       toast.success(editing ? 'Recorrência atualizada.' : 'Recorrência criada.', {
-        description: 'Use "Aplicar" para gerar as transações nos meses desejados.',
+        description: 'Já entra na projeção de saldo. As transações do mês atual e do próximo são geradas automaticamente todo dia.',
       });
       setFormOpen(false);
     } catch (err) {
@@ -196,6 +200,7 @@ export default function RecurringTransactions({ month }: { month: string }) {
                     <TableCell>{r.description}</TableCell>
                     <TableCell className="whitespace-nowrap">
                       {describeSchedule(r)}
+                      {r.autoConfirm && <p className="text-xs text-muted-foreground">confirma sozinha</p>}
                       <p className="text-xs text-muted-foreground">desde {formatDate(r.startDate)}</p>
                     </TableCell>
                     <TableCell className={r.type === 'income' ? 'text-green-600' : 'text-red-600'}>
@@ -372,6 +377,22 @@ export default function RecurringTransactions({ month }: { month: string }) {
               />
             </div>
 
+            <div className="flex items-center justify-between gap-3 rounded-md border p-3">
+              <div>
+                <Label htmlFor="rec-auto" className="font-normal">
+                  Confirmar automaticamente na data
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  Para o que acontece sozinho, como salário ou débito automático. Desligado, fica pendente até você marcar.
+                </p>
+              </div>
+              <Controller
+                control={control}
+                name="autoConfirm"
+                render={({ field }) => <Switch id="rec-auto" checked={field.value} onCheckedChange={field.onChange} />}
+              />
+            </div>
+
             <div className="space-y-2">
               <Label htmlFor="rec-note">Observação</Label>
               <Textarea id="rec-note" placeholder="Opcional" className="resize-none" {...register('note')} />
@@ -379,7 +400,7 @@ export default function RecurringTransactions({ month }: { month: string }) {
 
             {editing && (
               <p className="text-xs text-muted-foreground">
-                Alterações valem para as próximas aplicações; transações já geradas não mudam.
+                Alterações valem para as próximas ocorrências; transações já geradas não mudam.
               </p>
             )}
 

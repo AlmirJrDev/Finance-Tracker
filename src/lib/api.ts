@@ -1,11 +1,15 @@
 import type {
   ActiveMonth,
+  BudgetStatus,
   Category,
+  InstallmentInput,
   MonthSummary,
+  Projection,
   RecurringInput,
   RecurringTransaction,
   Transaction,
   TransactionInput,
+  TransactionStatus,
   TransactionType,
   YearSummary,
 } from '@/types/finance';
@@ -73,6 +77,7 @@ export type TransactionFilters = {
   from?: string;
   to?: string;
   type?: TransactionType;
+  status?: TransactionStatus;
   categoryId?: string;
   q?: string;
   sort?: 'asc' | 'desc';
@@ -87,6 +92,25 @@ export const api = {
     update: (id: string, input: Partial<TransactionInput>) =>
       request<Transaction>(`/api/transactions/${id}`, { method: 'PUT', body: input }),
     remove: (id: string) => request<void>(`/api/transactions/${id}`, { method: 'DELETE' }),
+    setStatus: (ids: string[], status: TransactionStatus) =>
+      request<{ modifiedCount: number }>('/api/transactions/status', { method: 'POST', body: { ids, status } }),
+    createInstallments: (input: InstallmentInput) =>
+      request<Transaction[]>('/api/transactions/installments', { method: 'POST', body: input }),
+    removeInstallments: (groupId: string, onlyPending: boolean) =>
+      request<{ deletedCount: number }>(`/api/transactions/installments/${groupId}`, {
+        method: 'DELETE',
+        query: { onlyPending },
+      }),
+  },
+
+  budgets: {
+    list: (month: string) => request<BudgetStatus[]>('/api/budgets', { query: { month } }),
+    save: (categoryId: string, input: { amountCents: number; alertPercent?: number }) =>
+      request<{ categoryId: string; amountCents: number; alertPercent: number }>(`/api/budgets/${categoryId}`, {
+        method: 'PUT',
+        body: input,
+      }),
+    remove: (categoryId: string) => request<void>(`/api/budgets/${categoryId}`, { method: 'DELETE' }),
   },
 
   categories: {
@@ -117,5 +141,6 @@ export const api = {
     month: (month: string) => request<MonthSummary>(`/api/summary/month/${month}`),
     year: (year: number) => request<YearSummary>(`/api/summary/year/${year}`),
     months: () => request<ActiveMonth[]>('/api/summary/months'),
+    projection: (days: number) => request<Projection>('/api/summary/projection', { query: { days } }),
   },
 };
