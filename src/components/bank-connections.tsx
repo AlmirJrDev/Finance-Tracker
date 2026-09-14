@@ -33,6 +33,12 @@ export function BankConnections() {
     return (
       <p className="rounded-md border p-3 text-xs text-muted-foreground">
         A conexão automática com bancos está disponível só para o titular configurado (Meu Pluggy, uso pessoal).
+        {status.email && (
+          <>
+            {' '}
+            Para liberar, o e-mail <strong className="text-foreground">{status.email}</strong> precisa estar em PLUGGY_ALLOWED_EMAILS no servidor.
+          </>
+        )}
       </p>
     );
   }

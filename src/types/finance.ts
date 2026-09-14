@@ -216,6 +216,8 @@ export interface ConnectionStatus {
   enabled: boolean;
   allowed: boolean;
   connectorId: number;
+  /** E-mail do usuário logado (é ele que precisa estar em PLUGGY_ALLOWED_EMAILS) */
+  email: string | null;
 }
 
 export interface SyncResult {
