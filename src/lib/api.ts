@@ -4,6 +4,9 @@ import type {
   TransferInput,
   ActiveMonth,
   Freshness,
+  BankConnection,
+  ConnectionStatus,
+  SyncResult,
   BudgetStatus,
   Category,
   InstallmentInput,
@@ -120,6 +123,17 @@ export const api = {
       request<Transaction | null>(`/api/accounts/${id}/adjust`, { method: 'POST', body: input }),
     transfer: (input: TransferInput) =>
       request<{ transferId: string; from: Transaction; to: Transaction }>('/api/accounts/transfers', { method: 'POST', body: input }),
+  },
+
+  connections: {
+    status: () => request<ConnectionStatus>('/api/connections/status'),
+    list: () => request<BankConnection[]>('/api/connections'),
+    connectToken: () => request<{ accessToken: string; connectorId: number }>('/api/connections/connect-token', { method: 'POST', body: {} }),
+    create: (input: { itemId: string; importFrom?: string }) =>
+      request<{ connection: BankConnection; sync: SyncResult | null }>('/api/connections', { method: 'POST', body: input }),
+    sync: (id: string) => request<{ connection: BankConnection; sync: SyncResult }>(`/api/connections/${id}/sync`, { method: 'POST', body: {} }),
+    remove: (id: string, deleteData: boolean) =>
+      request<{ deletedTransactions: number }>(`/api/connections/${id}`, { method: 'DELETE', query: { deleteData } }),
   },
 
   budgets: {

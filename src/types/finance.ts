@@ -200,6 +200,31 @@ export interface Projection {
   points: { date: string; balanceCents: number }[];
 }
 
+export interface BankConnection {
+  id: string;
+  provider: 'pluggy';
+  itemId: string;
+  connectorName: string | null;
+  status: string | null;
+  importFrom: string;
+  lastSyncAt: string | null;
+  lastSyncError: string | null;
+  accounts: { id: string; name: string; type: AccountType }[];
+}
+
+export interface ConnectionStatus {
+  enabled: boolean;
+  allowed: boolean;
+  connectorId: number;
+}
+
+export interface SyncResult {
+  accounts: number;
+  created: number;
+  updated: number;
+  skipped: number;
+}
+
 export interface Freshness {
   hasData: boolean;
   lastActivityAt: string | null;

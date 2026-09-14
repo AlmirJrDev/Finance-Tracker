@@ -19,12 +19,22 @@ export const queryKeys = {
   projection: (days: number, accountId?: string) => ['summary', 'projection', days, accountId ?? 'all'] as const,
   budgets: (month: string) => ['summary', 'budgets', month] as const,
   freshness: ['summary', 'freshness'] as const,
+  connectionStatus: ['connections', 'status'] as const,
+  connections: ['connections', 'list'] as const,
 };
 
 // ─── Leitura ──────────────────────────────────────────────────────────────────
 
 export function useCategories() {
   return useQuery({ queryKey: queryKeys.categories, queryFn: api.categories.list, staleTime: 5 * 60_000 });
+}
+
+export function useConnectionStatus() {
+  return useQuery({ queryKey: queryKeys.connectionStatus, queryFn: api.connections.status, staleTime: 10 * 60_000 });
+}
+
+export function useConnections(enabled: boolean) {
+  return useQuery({ queryKey: queryKeys.connections, queryFn: api.connections.list, enabled });
 }
 
 export function useFreshness() {
@@ -226,5 +236,23 @@ export function useAccountMutations() {
       onSuccess: refresh,
     }),
     transfer: useMutation({ mutationFn: (input: TransferInput) => api.accounts.transfer(input), onSuccess: refresh }),
+  };
+}
+
+export function useConnectionMutations() {
+  const qc = useQueryClient();
+  const invalidate = useInvalidateMoney();
+  const refresh = async () => {
+    await qc.invalidateQueries({ queryKey: ['connections'] });
+    await qc.invalidateQueries({ queryKey: queryKeys.categories });
+    await invalidate();
+  };
+  return {
+    create: useMutation({ mutationFn: api.connections.create, onSuccess: refresh }),
+    sync: useMutation({ mutationFn: api.connections.sync, onSuccess: refresh }),
+    remove: useMutation({
+      mutationFn: ({ id, deleteData }: { id: string; deleteData: boolean }) => api.connections.remove(id, deleteData),
+      onSuccess: refresh,
+    }),
   };
 }

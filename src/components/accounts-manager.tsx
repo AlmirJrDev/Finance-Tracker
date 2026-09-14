@@ -17,6 +17,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AccountSelect } from '@/components/forms/account-select';
+import { BankConnections } from '@/components/bank-connections';
 import { useAccountMutations, useAccounts } from '@/hooks/use-finance';
 import { ApiError } from '@/lib/api';
 import { ACCOUNT_TYPES, accountTypeMeta } from '@/lib/accounts';
@@ -431,6 +432,8 @@ export function AccountsManager({ open, onOpenChange }: { open: boolean; onOpenC
                 })}
               </ul>
             )}
+
+            <BankConnections />
 
             {archivedCount > 0 && (
               <Button variant="ghost" size="sm" className="self-start" onClick={() => setShowArchived(!showArchived)}>
